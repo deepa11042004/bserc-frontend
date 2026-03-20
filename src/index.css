@@ -1,0 +1,33 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base styles */
+@layer base {
+  body {
+    @apply m-0 bg-slate-50 text-slate-900 antialiased;
+    font-family: 'Poppins', sans-serif;
+
+    background-image: 
+      radial-gradient(circle at top right, rgba(153, 246, 228, 0.35), transparent 35%),
+      radial-gradient(circle at bottom left, rgba(186, 230, 253, 0.45), transparent 30%);
+  }
+
+  * {
+    @apply box-border;
+  }
+}
+
+/* Utilities */
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
