@@ -64,13 +64,13 @@ export const exploreMenuData = [
   },
   {
     label: 'Learn AI',
-    children: ['AI Fundamentals', 'AI For Professionals', 'AI For Developers', 'AI For Creatives'],
+    children: ['AI Fundamentals', 'AI For Professionals', 'AI For Developers', 'AI For Creatives',],
   },
 ]
 
 export const categories = [
   {
-    title: 'Generative AI',
+    title: 'Generative AIii',
     image:
       'https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=900&q=80',
   },
