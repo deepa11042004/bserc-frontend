@@ -72,7 +72,7 @@ export const courseDetailsData = {
   title: 'The AI Engineer Course 2026: Complete AI Engineer Bootcamp',
   subtitle:
     'Complete AI Engineer Training: Python, NLP, Transformers, LLMs, LangChain, Hugging Face, APIs',
-  tags: ['Bestseller', 'Role Play'],
+  tags: ['Bestseller'],
   rating: 4.6,
   ratingsCount: '17,930 ratings',
   learners: '121,550 learners',
@@ -97,7 +97,6 @@ export const courseDetailsData = {
     'Harness the power of Large Language Models',
   ],
   includes: [
-    '1 Role Play',
     '29.5 hours on-demand video',
     '107 coding exercises',
     '28 articles',
