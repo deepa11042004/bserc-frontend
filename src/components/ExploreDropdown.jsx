@@ -1,6 +1,6 @@
 import React from 'react'
 
-const ExploreDropdown = ({ menuData, activeCategory, setActiveCategory }) => {
+const ExploreDropdown = ({ menuData, activeCategory, setActiveCategory, onChildClick }) => {
   if (!menuData || menuData.length === 0) return null
 
   const leftClass = 'w-1/2'
@@ -50,11 +50,14 @@ const ExploreDropdown = ({ menuData, activeCategory, setActiveCategory }) => {
           </h3>
           <ul className="space-y-1">
             {menuData[activeCategory].children.map((sub) => (
-              <li
-                key={sub}
-                className="rounded-md px-3 py-2 text-sm text-slate-600 transition hover:bg-teal-50 hover:text-teal-700"
-              >
-                {sub}
+              <li key={sub}>
+                <button
+                  type="button"
+                  onClick={() => onChildClick?.(menuData[activeCategory].label, sub)}
+                  className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm text-slate-600 transition hover:bg-teal-50 hover:text-teal-700"
+                >
+                  {sub}
+                </button>
               </li>
             ))}
           </ul>

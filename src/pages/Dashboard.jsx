@@ -7,6 +7,7 @@ import { Play } from 'lucide-react';
 import SectionHeader from '../components/SectionHeader';
 import { FiArrowLeft, FiArrowRight } from 'react-icons/fi';
 import CourseCard from '../components/CourseCard';
+import { Link } from 'react-router-dom';
 
 import {
     aiCourses,
@@ -156,19 +157,24 @@ function Dashboard() {
                         ref={aiSliderRef}
                         className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto rounded-2xl bg-teal-950 p-5"
                     >
-                        {aiCourses.map((course) => (
-                            <article
-                                key={course.title}
-                                className="min-w-[260px] snap-start rounded-xl border border-white/10 bg-white p-4 shadow-sm"
-                            >
-                                <img src={course.image} alt={course.title} className="h-32 w-full rounded-lg object-cover" />
-                                <h3 className="mt-3 line-clamp-2 font-semibold text-slate-900">{course.title}</h3>
-                                <p className="mt-1 text-sm text-slate-500">{course.duration}</p>
-                                <button className="mt-4 rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-700">
-                                    Learn more
-                                </button>
-                            </article>
-                        ))}
+                        {aiCourses.map((course) => {
+                            const slug = encodeURIComponent(course.title.toLowerCase().replace(/\s+/g, '-'))
+                            return (
+                                <Link
+                                    key={course.title}
+                                    to={`/course/${slug}`}
+                                    state={{ course }}
+                                    className="min-w-[260px] snap-start rounded-xl border border-white/10 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow"
+                                >
+                                    <img src={course.image} alt={course.title} className="h-32 w-full rounded-lg object-cover" />
+                                    <h3 className="mt-3 line-clamp-2 font-semibold text-slate-900">{course.title}</h3>
+                                    <p className="mt-1 text-sm text-slate-500">{course.duration}</p>
+                                    <span className="mt-4 inline-flex rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-700">
+                                        Learn more
+                                    </span>
+                                </Link>
+                            )
+                        })}
                     </div>
                 </section>
                 <section>

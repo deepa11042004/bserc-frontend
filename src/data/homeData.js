@@ -68,6 +68,47 @@ export const exploreMenuData = [
   },
 ]
 
+export const courseDetailsData = {
+  title: 'The AI Engineer Course 2026: Complete AI Engineer Bootcamp',
+  subtitle:
+    'Complete AI Engineer Training: Python, NLP, Transformers, LLMs, LangChain, Hugging Face, APIs',
+  tags: ['Bestseller', 'Role Play'],
+  rating: 4.6,
+  ratingsCount: '17,930 ratings',
+  learners: '121,550 learners',
+  lastUpdated: '3/2026',
+  language: 'English',
+  captions: ['Arabic', 'Hindi', 'Bulgarian', 'Italian'],
+  price: '₹3,089',
+  guarantee: '30-day money-back guarantee',
+  lifetimeAccess: true,
+  couponApplied: 'KEEPLEARNING',
+  videoPreview:
+    'https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&w=1200&q=80',
+  instructor: '365 Careers',
+  whatYouWillLearn: [
+    'The course provides the entire toolbox you need to become an AI Engineer',
+    'Start coding in Python and learn how to use it for NLP and AI',
+    'Apply your skills to real-life business cases',
+    'Leverage LangChain for seamless development of AI-driven applications',
+    'Use APIs and connect to powerful foundation models',
+    'Understand key Artificial Intelligence concepts and build a solid foundation',
+    'Impress interviewers by showing an understanding of the AI field',
+    'Harness the power of Large Language Models',
+  ],
+  includes: [
+    '1 Role Play',
+    '29.5 hours on-demand video',
+    '107 coding exercises',
+    '28 articles',
+    '156 downloadable resources',
+    'Access on mobile and TV',
+    'Closed captions',
+    'Certificate of completion',
+  ],
+  relatedTopics: ['Artificial Intelligence (AI)', 'Data Science', 'Development'],
+}
+
 export const categories = [
   {
     title: 'Generative AIii',
