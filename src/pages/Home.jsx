@@ -9,7 +9,7 @@ import HeroSection from '../components/HeroSection'
 import Navbar from '../components/Navbar'
 import SectionHeader from '../components/SectionHeader'
 import SkeletonCard from '../components/SkeletonCard'
-import TestimonialCard from "../components/TestimonialCard"
+import TestimonialCard from '../components/TestimonialCard'
 import {
   aiCourses,
   careerPaths,
@@ -22,7 +22,6 @@ import {
   testimonials,
   trendingCourses,
 } from '../data/homeData'
-import { Link } from 'react-router-dom'
 
 function Home() {
   const categorySliderRef = useRef(null)
@@ -60,19 +59,31 @@ function Home() {
       behavior: 'smooth',
       inline: 'start',
       block: 'nearest',
-
     })
 
     setIndex(newIndex)
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen bg-black text-white">
       <Navbar links={navLinks} />
 
       <main className="mx-auto max-w-7xl space-y-14 px-4 pb-8 pt-6 sm:px-6 lg:px-8">
         <HeroSection />
-      
+
+        <section>
+          <SectionHeader
+            title="Trending courses"
+            subtitle="Hot picks from learners this month."
+            action="View all"
+          />
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {trendingCourses.map((course) => (
+              <CourseCard key={course.title} {...course} />
+            ))}
+          </div>
+        </section>
+
         <section>
           <SectionHeader
             title="Learn essential career and life skills"
@@ -91,9 +102,9 @@ function Home() {
               }}
               className="flex items-stretch gap-5 overflow-x-auto scroll-smooth px-8 snap-x snap-mandatory no-scrollbar"
             >
-              {categories.map((category) => (
+              {categories.map((category, index) => (
                 <div
-                  key={category.title}
+                  key={`${category.title}-${index}`}
                   className="w-[280px] flex-shrink-0 snap-start"
                 >
                   <CategoryCard
@@ -120,9 +131,9 @@ function Home() {
                 )
               }
               disabled={categoryIndex === 0}
-              className="rounded-full bg-white p-2 shadow hover:bg-slate-100 active:scale-95 transition disabled:opacity-40"
+              className="rounded-full bg-[#0f172a] p-2 shadow-lg shadow-[#3B82F6]/30 transition hover:bg-[#111827] active:scale-95 disabled:opacity-40"
             >
-              <FiArrowLeft />
+              <FiArrowLeft className="text-[#3B82F6]" />
             </button>
 
 
@@ -152,16 +163,16 @@ function Home() {
                 )
               }
               disabled={categoryIndex === categories.length - 1}
-              className="rounded-full bg-white p-2 shadow hover:bg-slate-100 active:scale-95 transition disabled:opacity-40"
+              className="rounded-full bg-[#0f172a] p-2 shadow-lg shadow-[#3B82F6]/30 transition hover:bg-[#111827] active:scale-95 disabled:opacity-40"
             >
-              <FiArrowRight />
+              <FiArrowRight className="text-[#3B82F6]" />
             </button>
           </div>
         </section>
 
         <section>
           <SectionHeader
-            title="Learn AI with Google"
+            title="Learn Robotics with BSERC"
             subtitle="Short programs designed to help you use AI in your day-to-day work."
           />
 
@@ -176,7 +187,7 @@ function Home() {
                   aiCourses.length
                 )
               }
-              className="rounded-full border border-slate-300 bg-white p-2 text-slate-700 transition hover:border-teal-500 hover:text-teal-700"
+              className="rounded-full bg-[#0f172a] p-2 shadow-lg shadow-[#3B82F6]/30 text-[#3B82F6] transition hover:bg-[#111827] hover:text-white"
               aria-label="Scroll left"
             >
               <FiArrowLeft />
@@ -191,7 +202,7 @@ function Home() {
                   aiCourses.length
                 )
               }
-              className="rounded-full border border-slate-300 bg-white p-2 text-slate-700 transition hover:border-teal-500 hover:text-teal-700"
+              className="rounded-full bg-[#0f172a] p-2 shadow-lg shadow-[#3B82F6]/30 text-[#3B82F6] transition hover:bg-[#111827] hover:text-white"
               aria-label="Scroll right"
             >
               <FiArrowRight />
@@ -200,26 +211,21 @@ function Home() {
 
           <div
             ref={aiSliderRef}
-            className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto rounded-2xl bg-teal-950 p-5"
+            className="no-scrollbar relative flex snap-x snap-mandatory gap-4 overflow-x-auto rounded-2xl bg-teal-950 p-5"
           >
-            {aiCourses.map((course) => {
-              const slug = encodeURIComponent(course.title.toLowerCase().replace(/\s+/g, '-'))
-              return (
-                <Link
-                  key={course.title}
-                  to={`/course/${slug}`}
-                  state={{ course }}
-                  className="min-w-[260px] snap-start rounded-xl border border-white/10 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow"
-                >
-                  <img src={course.image} alt={course.title} className="h-32 w-full rounded-lg object-cover" />
-                  <h3 className="mt-3 line-clamp-2 font-semibold text-slate-900">{course.title}</h3>
-                  <p className="mt-1 text-sm text-slate-500">{course.duration}</p>
-                  <span className="mt-4 inline-flex rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-700">
-                    Learn more
-                  </span>
-                </Link>
-              )
-            })}
+            {aiCourses.map((course, index) => (
+              <div key={`${course.title}-${index}`} className="min-w-[260px] snap-start">
+                <CourseCard
+                  title={course.title}
+                  instructor={course.duration}
+                  rating={course.rating || '4.7'}
+                  price={course.price || '₹2,499'}
+                  image={course.image}
+                  description={course.description}
+                  learningPoints={course.learningPoints}
+                />
+              </div>
+            ))}
           </div>
         </section>
 
@@ -277,8 +283,8 @@ function Home() {
           </div>
         </section>
 
-        <section className="rounded-3xl bg-white p-6 shadow-sm">
-          <p className="mb-6 text-center text-sm font-medium text-slate-500">
+        <section className="rounded-3xl bg-[#0f172a] p-6 shadow-[0_10px_30px_rgba(0,0,0,0.4)]">
+          <p className="mb-6 text-center text-sm font-medium text-slate-300">
             Trusted by leading teams around the world
           </p>
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-5">
@@ -287,7 +293,7 @@ function Home() {
               return (
                 <div
                   key={company.name}
-                  className="group flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 py-4 text-slate-400 transition hover:border-teal-200 hover:bg-white hover:text-teal-700"
+                  className="group flex items-center justify-center gap-2 rounded-xl border border-indigo-500/20 bg-[#111827] py-4 text-slate-300 transition hover:border-[#3B82F6]/40 hover:bg-[#1f2937] hover:text-white"
                 >
                   <Icon size={20} />
                   <span className="text-sm font-semibold">{company.name}</span>
@@ -342,43 +348,7 @@ function Home() {
           </div>
         </section>
 
-        <section>
-          <SectionHeader
-            title="Ready to reimagine your career?"
-            subtitle="Choose a guided path and get curated lessons that map to your goals."
-          />
-          <div className="grid gap-5 md:grid-cols-3">
-            {careerPaths.map((path) => {
-              const Icon = path.icon
-              return (
-                <article
-                  key={path.title}
-                  className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
-                >
-                  <img src={path.image} alt={path.title} className="h-44 w-full object-cover" />
-                  <div className="space-y-2 p-4">
-                    <h3 className="font-semibold text-slate-900">{path.title}</h3>
-                    <p className="text-sm text-slate-600">{path.description}</p>
-                    <Icon className="text-teal-700" />
-                  </div>
-                </article>
-              )
-            })}
-          </div>
-        </section>
-
-        <section>
-          <SectionHeader
-            title="Trending courses"
-            subtitle="Hot picks from learners this month."
-            action="View all"
-          />
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {trendingCourses.map((course) => (
-              <CourseCard key={course.title} {...course} />
-            ))}
-          </div>
-        </section>
+        
       </main>
 
       <Footer columns={footerColumns} />

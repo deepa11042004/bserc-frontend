@@ -9,21 +9,21 @@ const CourseHeader = ({ title, subtitle, tags = [], rating, ratingsCount, learne
         ))}
       </div>
 
-      <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl lg:text-4xl">{title}</h1>
-      <p className="text-base text-slate-700 sm:text-lg">{subtitle}</p>
+      <h1 className="text-2xl font-bold text-slate-50 sm:text-3xl lg:text-4xl">{title}</h1>
+      <p className="text-base text-slate-300 sm:text-lg">{subtitle}</p>
 
-      <div className="flex flex-wrap items-center gap-3 text-sm text-slate-700">
-        <div className="flex items-center gap-2 font-semibold text-amber-600">
+      <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
+        <div className="flex items-center gap-2 font-semibold text-amber-400">
           <span>{rating}</span>
-          <div className="text-xs text-slate-500">{ratingsCount}</div>
+          <div className="text-xs text-slate-400">{ratingsCount}</div>
         </div>
-        <span className="text-slate-500">{learners}</span>
-        <span className="text-slate-500">Last updated {lastUpdated}</span>
-        <span className="text-slate-500">{language}</span>
+        <span className="text-slate-400">{learners}</span>
+        <span className="text-slate-400">Last updated {lastUpdated}</span>
+        <span className="text-slate-400">{language}</span>
         {captions && captions.length > 0 && (
-          <span className="text-slate-500">Captions: {captions.join(', ')}</span>
+          <span className="text-slate-400">Captions: {captions.join(', ')}</span>
         )}
-        <span className="text-slate-600 font-semibold">Created by {instructor}</span>
+        <span className="font-semibold text-slate-200">Created by {instructor}</span>
       </div>
     </section>
   )

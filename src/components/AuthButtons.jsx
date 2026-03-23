@@ -21,8 +21,8 @@ const AuthButtons = ({ user, onLogout }) => {
     return (
       <div className="flex items-center gap-3">
         <Link
-          to="/dashboard"
-          className="rounded-lg px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-100"
+          to="/my-learning"
+          className="rounded-lg px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-[#1f2937]"
         >
           My Learning
         </Link>
@@ -31,22 +31,22 @@ const AuthButtons = ({ user, onLogout }) => {
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-700 focus:outline-none"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1f2937] text-sm font-semibold text-slate-100 ring-1 ring-indigo-500/40 focus:outline-none"
           >
             {initials}
           </button>
 
           {open && (
-            <div className="absolute right-0 mt-2 w-40 rounded-lg border border-slate-200 bg-white shadow-lg">
-              <div className="px-3 py-2 text-xs text-slate-500">Signed in as</div>
-              <div className="px-3 pb-2 text-sm font-semibold text-slate-800">{user.username}</div>
+            <div className="absolute right-0 mt-2 w-44 rounded-lg border border-indigo-500/30 bg-[#0f172a] shadow-xl shadow-black/50 backdrop-blur">
+              <div className="px-3 py-2 text-xs text-slate-400">Signed in as</div>
+              <div className="px-3 pb-2 text-sm font-semibold text-white">{user.username}</div>
               <button
                 type="button"
                 onClick={() => {
                   setOpen(false)
                   onLogout?.()
                 }}
-                className="block w-full px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-100"
+                className="block w-full px-3 py-2 text-left text-sm text-slate-100 transition hover:bg-[#111827]"
               >
                 Logout
               </button>
@@ -61,13 +61,13 @@ const AuthButtons = ({ user, onLogout }) => {
     <div className="inline-flex items-center gap-2">
       <Link
         to="/login"
-        className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-100"
+        className="rounded-lg border border-indigo-500/50 px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-[#111827]"
       >
         Login
       </Link>
       <Link
         to="/signup"
-        className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+        className="rounded-lg bg-[#3B82F6] px-4 py-2 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(59,130,246,0.35)] transition hover:scale-[1.02]"
       >
         Signup
       </Link>

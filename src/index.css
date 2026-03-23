@@ -7,12 +7,13 @@
 /* Base styles */
 @layer base {
   body {
-    @apply m-0 bg-slate-50 text-slate-900 antialiased;
+    @apply m-0 antialiased;
     font-family: 'Poppins', sans-serif;
-
-    background-image: 
-      radial-gradient(circle at top right, rgba(153, 246, 228, 0.35), transparent 35%),
-      radial-gradient(circle at bottom left, rgba(186, 230, 253, 0.45), transparent 30%);
+    color: #ffffff;
+    background: #000000;
+    background-image: radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.1), transparent 28%),
+      radial-gradient(circle at 80% 0%, rgba(34, 211, 238, 0.08), transparent 25%),
+      radial-gradient(circle at 50% 100%, rgba(0, 6, 23, 0.7), #000000 60%);
   }
 
   * {

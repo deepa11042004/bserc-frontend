@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom'
+import logo from '../assets/logo.webp'
 
-const Logo = () => (
-  <Link to="/" className="inline-flex items-center gap-2 text-xl font-bold text-slate-900 hover:text-teal-700">
-    <span className="rounded-lg bg-teal-600 px-2 py-1 text-white">B</span>
-    <span>Bserc-LMS</span>
+const Logo = ({ to = '/' }) => (
+  <Link to={to} className="inline-flex items-center gap-2 text-xl font-bold text-white hover:text-[#22D3EE]">
+    <img src={logo} alt="Bserc Logo" className="h-10 w-10 object-contain" />
+    <span>BSERC</span>
   </Link>
 )
 
