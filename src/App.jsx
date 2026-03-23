@@ -8,6 +8,7 @@ import Cart from "./pages/Cart";
 import MyLearning from "./pages/MyLearning";
 import Learn from "./pages/Learn";
 import Profile from "./pages/Profile";
+import Search from "./pages/Search";
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
       <Route path="/my-learning" element={<MyLearning />} />
       <Route path="/learn/:courseId" element={<Learn />} />
       <Route path="/profile" element={<Profile />} />
+      <Route path="/search" element={<Search />} />
     </Routes>
   );
 }
