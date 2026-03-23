@@ -154,7 +154,7 @@ const Learn = () => {
           </div>
 
           {activeTab === 'Course Content' && (
-            <div className="space-y-3">
+            <div className="space-y-3 max-w-4xl">
               {modules.map((module) => (
                 <div key={module.id} className="rounded-xl border border-slate-800 bg-slate-900">
                   <button

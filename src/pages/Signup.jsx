@@ -98,7 +98,7 @@ const Signup = () => {
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold uppercase tracking-widest text-[#3B82F6] ml-1">
-                    Security Key
+                    Password
                   </label>
                   <div className="relative">
                     <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />

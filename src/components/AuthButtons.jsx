@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { useCart } from '../context/CartContext'
 
 const AuthButtons = ({ user, onLogout }) => {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { items: cartItems } = useCart()
   const [open, setOpen] = useState(false)
   const menuRef = useRef(null)
+  const hoverTimerRef = useRef(null)
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -16,10 +21,28 @@ const AuthButtons = ({ user, onLogout }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  const handleMouseEnter = () => {
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+    setOpen(true)
+  }
+
+  const handleMouseLeave = () => {
+    hoverTimerRef.current = setTimeout(() => setOpen(false), 120)
+  }
+
+  const handleLogout = () => {
+    setOpen(false)
+    onLogout?.()
+    navigate('/')
+  }
+
   if (user) {
     const initials = user.username ? user.username.slice(0, 2).toUpperCase() : 'ME'
+    const displayName = user.username || 'John Doe'
+    const displayEmail = user.email || 'john@example.com'
+    const cartCount = cartItems?.length || 0
     return (
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3" onMouseLeave={handleMouseLeave}>
         <Link
           to="/my-learning"
           className="rounded-lg px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-[#1f2937]"
@@ -27,7 +50,11 @@ const AuthButtons = ({ user, onLogout }) => {
           My Learning
         </Link>
 
-        <div className="relative" ref={menuRef}>
+        <div
+          className="relative"
+          ref={menuRef}
+          onMouseEnter={handleMouseEnter}
+        >
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
@@ -37,19 +64,114 @@ const AuthButtons = ({ user, onLogout }) => {
           </button>
 
           {open && (
-            <div className="absolute right-0 mt-2 w-44 rounded-lg border border-indigo-500/30 bg-[#0f172a] shadow-xl shadow-black/50 backdrop-blur">
-              <div className="px-3 py-2 text-xs text-slate-400">Signed in as</div>
-              <div className="px-3 pb-2 text-sm font-semibold text-white">{user.username}</div>
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false)
-                  onLogout?.()
-                }}
-                className="block w-full px-3 py-2 text-left text-sm text-slate-100 transition hover:bg-[#111827]"
-              >
-                Logout
-              </button>
+            <div
+              className="absolute right-0 z-50 mt-2 w-72 rounded-2xl border border-indigo-500/30 bg-[#0b1224] shadow-2xl shadow-black/50 backdrop-blur transition duration-150"
+              onMouseLeave={handleMouseLeave}
+            >
+              <div className="flex items-center gap-3 border-b border-slate-800/60 px-4 py-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white">
+                  {initials}
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-white">{displayName}</div>
+                  <div className="text-xs text-slate-400">{displayEmail}</div>
+                </div>
+              </div>
+
+              <div className="py-1 text-sm text-slate-100">
+                <div className="px-4 py-1 text-xs uppercase tracking-[0.12em] text-slate-500">Learning & Shopping</div>
+                <Link
+                  to="/my-learning"
+                  className={`block px-4 py-2 transition hover:bg-[#111827] ${location.pathname === '/my-learning' ? 'bg-[#111827]' : ''}`}
+                  onClick={() => setOpen(false)}
+                >
+                  My Learning
+                </Link>
+                <Link
+                  to="/cart"
+                  className={`flex items-center justify-between px-4 py-2 transition hover:bg-[#111827] ${location.pathname === '/cart' ? 'bg-[#111827]' : ''}`}
+                  onClick={() => setOpen(false)}
+                >
+                  <span>My Cart</span>
+                  {cartCount > 0 && (
+                    <span className="rounded-full bg-indigo-500 px-2 text-xs font-semibold text-white">{cartCount}</span>
+                  )}
+                </Link>
+                <Link
+                  to="/wishlist"
+                  className={`block px-4 py-2 transition hover:bg-[#111827] ${location.pathname === '/wishlist' ? 'bg-[#111827]' : ''}`}
+                  onClick={() => setOpen(false)}
+                >
+                  Wishlist
+                </Link>
+
+                <div className="my-2 h-px bg-slate-800" />
+                <div className="px-4 py-1 text-xs uppercase tracking-[0.12em] text-slate-500">Account</div>
+                <Link
+                  to="/profile"
+                  className={`block px-4 py-2 transition hover:bg-[#111827] ${location.pathname === '/profile' ? 'bg-[#111827]' : ''}`}
+                  onClick={() => setOpen(false)}
+                >
+                  Profile
+                </Link>
+                <Link
+                  to="/settings"
+                  className={`block px-4 py-2 transition hover:bg-[#111827] ${location.pathname === '/settings' ? 'bg-[#111827]' : ''}`}
+                  onClick={() => setOpen(false)}
+                >
+                  Account Settings
+                </Link>
+                <Link
+                  to="/billing"
+                  className={`block px-4 py-2 transition hover:bg-[#111827] ${location.pathname === '/billing' ? 'bg-[#111827]' : ''}`}
+                  onClick={() => setOpen(false)}
+                >
+                  Billing & Payments
+                </Link>
+                <Link
+                  to="/purchase-history"
+                  className={`block px-4 py-2 transition hover:bg-[#111827] ${location.pathname === '/purchase-history' ? 'bg-[#111827]' : ''}`}
+                  onClick={() => setOpen(false)}
+                >
+                  Purchase History
+                </Link>
+
+                <div className="my-2 h-px bg-slate-800" />
+                <div className="px-4 py-1 text-xs uppercase tracking-[0.12em] text-slate-500">User Features</div>
+                <Link
+                  to="/notifications"
+                  className={`block px-4 py-2 transition hover:bg-[#111827] ${location.pathname === '/notifications' ? 'bg-[#111827]' : ''}`}
+                  onClick={() => setOpen(false)}
+                >
+                  Notifications
+                </Link>
+                <Link
+                  to="/messages"
+                  className={`block px-4 py-2 transition hover:bg-[#111827] ${location.pathname === '/messages' ? 'bg-[#111827]' : ''}`}
+                  onClick={() => setOpen(false)}
+                >
+                  Messages
+                </Link>
+
+                <div className="my-2 h-px bg-slate-800" />
+                <div className="px-4 py-1 text-xs uppercase tracking-[0.12em] text-slate-500">Support</div>
+                <Link
+                  to="/support"
+                  className={`block px-4 py-2 transition hover:bg-[#111827] ${location.pathname === '/support' ? 'bg-[#111827]' : ''}`}
+                  onClick={() => setOpen(false)}
+                >
+                  Help Center
+                </Link>
+
+                <div className="my-2 h-px bg-slate-800" />
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="block w-full px-4 py-2 text-left font-semibold text-red-300 transition hover:bg-[#111827]"
+                >
+                  Logout
+                </button>
+              </div>
             </div>
           )}
         </div>

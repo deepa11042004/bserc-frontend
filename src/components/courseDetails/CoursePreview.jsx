@@ -17,14 +17,14 @@ const CoursePreview = ({ price, guarantee, lifetimeAccess, couponApplied, videoP
           <button
             type="button"
             onClick={onAddToCart}
-            className="w-full rounded-lg bg-purple-600 px-4 py-2 text-white font-semibold transition hover:bg-purple-700"
+            className="w-full rounded-lg bg-[#3B82F6] px-4 py-2 text-white font-semibold shadow-[0_10px_30px_rgba(59,130,246,0.35)] transition hover:scale-[1.01] hover:bg-[#2563eb]"
           >
             Add to cart
           </button>
           <button
             type="button"
             onClick={onBuyNow}
-            className="w-full rounded-lg border border-purple-400 px-4 py-2 text-purple-200 font-semibold transition hover:bg-purple-500/10"
+            className="w-full rounded-lg border border-[#60A5FA] px-4 py-2 text-slate-100 font-semibold transition hover:bg-[#1e293b] hover:border-[#3B82F6]"
           >
             Buy now
           </button>
@@ -34,6 +34,7 @@ const CoursePreview = ({ price, guarantee, lifetimeAccess, couponApplied, videoP
           <div className="flex items-center justify-between rounded-lg bg-slate-800 px-3 py-2 text-xs text-slate-200">
             <span>Coupon applied</span>
             <span className="font-semibold text-purple-200">{couponApplied}</span>
+              <span className="font-semibold text-[#93c5fd]">{couponApplied}</span>
           </div>
         )}
       </div>
