@@ -9,6 +9,7 @@ import MyLearning from "./pages/MyLearning";
 import Learn from "./pages/Learn";
 import Profile from "./pages/Profile";
 import Search from "./pages/Search";
+import AdminDashboard from "./pages/admin/AdminDashboard";
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
       <Route path="/learn/:courseId" element={<Learn />} />
       <Route path="/profile" element={<Profile />} />
       <Route path="/search" element={<Search />} />
+      <Route path="/admin" element={<AdminDashboard />} />
     </Routes>
   );
 }
