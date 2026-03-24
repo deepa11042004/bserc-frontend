@@ -8,6 +8,7 @@ import Footer from '../components/Footer'
 import HeroSection from '../components/HeroSection'
 import Navbar from '../components/Navbar'
 import SectionHeader from '../components/SectionHeader'
+import SupportingSection from '../components/SupportingSection'
 import SkeletonCard from '../components/SkeletonCard'
 import TestimonialCard from '../components/TestimonialCard'
 import {
@@ -15,7 +16,6 @@ import {
   careerPaths,
   categories,
   certifications,
-  companyLogos,
   footerColumns,
   navLinks,
   skillsCourses,
@@ -283,25 +283,7 @@ function Home() {
           </div>
         </section>
 
-        <section className="rounded-3xl bg-[#0f172a] p-6 shadow-[0_10px_30px_rgba(0,0,0,0.4)]">
-          <p className="mb-6 text-center text-sm font-medium text-slate-300">
-            Trusted by leading teams around the world
-          </p>
-          <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-5">
-            {companyLogos.map((company) => {
-              const Icon = company.icon
-              return (
-                <div
-                  key={company.name}
-                  className="group flex items-center justify-center gap-2 rounded-xl border border-indigo-500/20 bg-[#111827] py-4 text-slate-300 transition hover:border-[#3B82F6]/40 hover:bg-[#1f2937] hover:text-white"
-                >
-                  <Icon size={20} />
-                  <span className="text-sm font-semibold">{company.name}</span>
-                </div>
-              )
-            })}
-          </div>
-        </section>
+        <SupportingSection />
 
         <section>
           <SectionHeader

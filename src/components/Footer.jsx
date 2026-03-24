@@ -1,5 +1,10 @@
 import { FaFacebookF, FaInstagram, FaTwitter, FaLinkedinIn } from 'react-icons/fa'
 import { FiMapPin, FiPhone, FiMail } from 'react-icons/fi'
+import logo from '../assets/logo.png'
+import ministryLogo from '../assets/Ministry_of_Education_India.svg.png'
+import drdoLogo from '../assets/Defence_Research_and_Development_Organisation.svg.png'
+import isroLogo from '../assets/Indian_Space_Research_Organisation_Logo.svg.png'
+import iitDelhiLogo from '../assets/Indian_Institute_of_Technology_Delhi_Logo.svg.png'
 
 const socialLinks = [
   { icon: FaFacebookF, label: 'Facebook', href: '#' },
@@ -27,20 +32,40 @@ const Footer = () => {
           {/* Brand */}
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0b1224] text-[#3B82F6] font-black text-lg shadow-[0_0_18px_rgba(59,130,246,0.35)]">
-                B
+              <div className="flex h-12 w-12 items-center justify-center">
+                <img src={logo} alt="BSERC logo" className="h-full w-full object-contain" />
               </div>
               <div>
                 <p className="text-xl font-bold">BSERC</p>
                 <p className="text-xs tracking-[0.2em] text-slate-400">HUB FOR SPACE EDUCATION</p>
               </div>
             </div>
+            <div className="mt-2 flex items-center gap-3">
+              {[
+                { src: ministryLogo, alt: 'Partner logo', style: { filter: 'brightness(0) invert(1)' } },
+                { src: drdoLogo, alt: 'Partner logo' },
+                { src: isroLogo, alt: 'Partner logo' },
+                { src: iitDelhiLogo, alt: 'Partner logo' },
+              ].map((item, idx) => (
+                <div
+                  key={idx}
+                  className="flex h-10 w-20 items-center justify-center"
+                >
+                  <img
+                    src={item.src}
+                    alt={item.alt}
+                    className="h-full w-full object-contain"
+                    style={item.style}
+                  />
+                </div>
+              ))}
+            </div>
             <p className="text-sm text-slate-300 leading-relaxed">
               Empowering Future Innovators in Space Exploration. We are dedicated to advancing space
               science education and fostering innovation across India.
             </p>
 
-            <div className="flex items-center gap-3 pt-2">
+            <div className="flex items-center gap-3">
               {socialLinks.map(({ icon: Icon, label, href }) => (
                 <a
                   key={label}
