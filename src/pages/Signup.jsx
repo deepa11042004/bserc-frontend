@@ -5,12 +5,15 @@ import { FiMail, FiUser, FiLock, FiChevronRight } from 'react-icons/fi'
 import Navbar from '../components/Navbar'
 import { getStoredUser } from '../hooks/useAuth'
 
+const API_URL = import.meta.env.VITE_API_URL
+
 const Signup = () => {
   const navigate = useNavigate()
-  const [username, setUsername] = useState('')
+  const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
@@ -19,14 +22,37 @@ const Signup = () => {
     }
   }, [navigate])
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setIsSubmitting(true)
-    setMessage('Signal Transmitted. Initializing profile...')
-    
-    setTimeout(() => {
-      navigate('/login')
-    }, 1500)
+    setMessage('')
+    setError('')
+
+    try {
+      const res = await fetch(`${API_URL}/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ full_name: fullName, email, password }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data?.message || 'Registration failed')
+        setIsSubmitting(false)
+        return
+      }
+
+      setMessage('Registration successful. Redirecting to login...')
+      setIsSubmitting(false)
+      setTimeout(() => navigate('/login', { replace: true }), 1200)
+    } catch (err) {
+      console.error(err)
+      setError('Server error')
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -64,14 +90,14 @@ const Signup = () => {
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold uppercase tracking-widest text-[#3B82F6] ml-1">
-                    Username
+                    Full Name
                   </label>
                   <div className="relative">
                     <FiUser className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                     <input
                       type="text"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
                       className="w-full rounded-xl border border-white/10 bg-black/40 py-3 pl-10 pr-4 text-sm text-white outline-none transition-all placeholder:text-slate-600 focus:border-[#3B82F6]/50 focus:ring-4 focus:ring-[#3B82F6]/10"
                       placeholder="SpaceExplorer_01"
                       required
@@ -115,6 +141,15 @@ const Signup = () => {
               </div>
 
               <AnimatePresence>
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="flex items-center gap-2 text-red-400 bg-red-400/10 p-3 rounded-lg border border-red-400/20"
+                  >
+                    <span className="text-xs font-medium">{error}</span>
+                  </motion.div>
+                )}
                 {message && (
                   <motion.div 
                     initial={{ opacity: 0, height: 0 }}

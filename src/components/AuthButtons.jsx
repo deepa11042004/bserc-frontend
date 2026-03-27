@@ -33,14 +33,15 @@ const AuthButtons = ({ user, onLogout }) => {
   const handleLogout = () => {
     setOpen(false)
     onLogout?.()
-    navigate('/')
   }
 
   if (user) {
-    const initials = user.username ? user.username.slice(0, 2).toUpperCase() : 'ME'
-    const displayName = user.username || 'John Doe'
+    if (user.role && user.role !== 'user') return null
+    const displayName = user.full_name || user.name || user.username || 'John Doe'
+    const initials = displayName.slice(0, 2).toUpperCase()
     const displayEmail = user.email || 'john@example.com'
     const cartCount = cartItems?.length || 0
+
     return (
       <div className="flex items-center gap-3" onMouseLeave={handleMouseLeave}>
         <Link

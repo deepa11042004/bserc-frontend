@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   FiActivity,
   FiBookOpen,
@@ -30,8 +31,10 @@ import { statsService } from '../../services/statsService'
 import { reviewService } from '../../services/reviewService'
 import { siteContentService } from '../../services/siteContentService'
 import { couponService } from '../../services/couponService'
+import { logoutAdmin } from '../../utils/auth'
 
 const AdminDashboard = () => {
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('overview')
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({})
@@ -185,10 +188,12 @@ const AdminDashboard = () => {
 
   if (loading) return <div className="flex min-h-screen items-center justify-center bg-[#0b1220] text-white">Loading admin data...</div>
 
+  const handleLogout = () => logoutAdmin(navigate)
+
   return (
     <div className="min-h-screen bg-[#0b1220] text-white">
       <div className="mx-auto flex max-w-7xl gap-6 px-4 py-8">
-        <AdminSidebar tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+        <AdminSidebar tabs={tabs} activeTab={activeTab} onChange={setActiveTab} onLogout={handleLogout} />
 
         <div className="flex-1 space-y-6">
           <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-[#0f172a] px-5 py-4 shadow-2xl shadow-black/40">

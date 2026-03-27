@@ -1,25 +1,11 @@
 import { useEffect, useState } from 'react'
+import { clearAuth, getUser, setAuth } from '../utils/auth'
 
-const AUTH_KEY = 'authUser'
+export const getStoredUser = () => getUser()
 
-export const getStoredUser = () => {
-  try {
-    const raw = localStorage.getItem(AUTH_KEY)
-    return raw ? JSON.parse(raw) : null
-  } catch (err) {
-    return null
-  }
-}
+export const setStoredUser = (user, token) => setAuth(token, user)
 
-export const setStoredUser = (user) => {
-  localStorage.setItem(AUTH_KEY, JSON.stringify(user))
-  window.dispatchEvent(new Event('auth-changed'))
-}
-
-export const clearStoredUser = () => {
-  localStorage.removeItem(AUTH_KEY)
-  window.dispatchEvent(new Event('auth-changed'))
-}
+export const clearStoredUser = () => clearAuth()
 
 export const useAuthState = () => {
   const [user, setUser] = useState(() => getStoredUser())

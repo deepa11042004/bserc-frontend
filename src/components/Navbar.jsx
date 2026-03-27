@@ -1,4 +1,5 @@
-import { useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import Logo from './Logo'
 import ExploreMenu from './ExploreMenu'
 import SearchBar from './SearchBar'
@@ -8,11 +9,21 @@ import { clearStoredUser, useAuthState } from '../hooks/useAuth'
 
 const Navbar = () => {
   const navigate = useNavigate()
+  const location = useLocation()
   const { user } = useAuthState()
+  const isStaff = user?.role && user.role !== 'user'
+
+  useEffect(() => {
+    if (isStaff && !location.pathname.startsWith('/admin')) {
+      clearStoredUser()
+      navigate('/admin/login', { replace: true })
+    }
+  }, [isStaff, location.pathname, navigate])
 
   const handleLogout = () => {
     clearStoredUser()
-    navigate('/')
+      const isAdmin = user?.role && user.role !== 'user'
+      navigate(isAdmin ? '/admin/login' : '/login', { replace: true })
   }
 
   return (

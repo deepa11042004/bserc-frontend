@@ -1,4 +1,4 @@
-const AdminSidebar = ({ tabs, activeTab, onChange }) => (
+const AdminSidebar = ({ tabs, activeTab, onChange, onLogout }) => (
   <aside className="w-full max-w-[240px] flex-shrink-0 rounded-2xl border border-slate-800 bg-[#0c1324] p-4 shadow-2xl shadow-black/40">
     <div className="mb-6 text-sm font-semibold text-slate-300">Admin Navigation</div>
     <div className="flex flex-col gap-2">
@@ -15,6 +15,15 @@ const AdminSidebar = ({ tabs, activeTab, onChange }) => (
           </button>
         )
       })}
+      <div className="mt-4 border-t border-slate-800 pt-3">
+        <button
+          type="button"
+          onClick={onLogout}
+          className="w-full rounded-xl border border-slate-700 px-3 py-2 text-sm font-semibold text-red-200 transition hover:border-red-500 hover:bg-red-500/10 hover:text-white"
+        >
+          Logout
+        </button>
+      </div>
     </div>
   </aside>
 )

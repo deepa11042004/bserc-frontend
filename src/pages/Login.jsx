@@ -3,7 +3,10 @@ import { Link, useNavigate } from 'react-router-dom'
 import { FiEye, FiEyeOff, FiLock, FiUser } from 'react-icons/fi'
 import { motion, AnimatePresence } from 'framer-motion'
 import Navbar from '../components/Navbar'
-import { getStoredUser, setStoredUser } from '../hooks/useAuth'
+import { getStoredUser } from '../hooks/useAuth'
+import { setAuth } from '../utils/auth'
+
+const API_URL = import.meta.env.VITE_API_URL
 
 const Login = () => {
   const navigate = useNavigate()
@@ -23,17 +26,37 @@ const Login = () => {
     e.preventDefault()
     setIsSubmitting(true)
     setError('')
-    
-    // Simulate space-grade authentication processing
-    setTimeout(() => {
-      if (username === 'admin' && password === 'admin123') {
-        setStoredUser({ username })
-        navigate('/dashboard')
-      } else {
-        setError('Authentication failed: Invalid coordinates or key.')
+
+    try {
+      const res = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: username, password }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data?.message || 'Login failed')
         setIsSubmitting(false)
+        return
       }
-    }, 1000)
+
+      if (data?.user?.role !== 'user') {
+        setError('Please use the admin login page.')
+        setIsSubmitting(false)
+        return
+      }
+
+      setAuth(data.token, data.user)
+      navigate('/dashboard', { replace: true })
+    } catch (err) {
+      console.error(err)
+      setError('Server error')
+      setIsSubmitting(false)
+    }
   }
 
   return (
