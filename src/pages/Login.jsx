@@ -5,8 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Navbar from '../components/Navbar'
 import { getStoredUser } from '../hooks/useAuth'
 import { setAuth } from '../utils/auth'
-
-const API_URL = import.meta.env.VITE_API_URL
+import { buildApiUrl, parseJsonSafe } from '../utils/apiClient'
 
 const Login = () => {
   const navigate = useNavigate()
@@ -28,7 +27,7 @@ const Login = () => {
     setError('')
 
     try {
-      const res = await fetch(`${API_URL}/auth/login`, {
+      const res = await fetch(buildApiUrl('/auth/login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -36,7 +35,7 @@ const Login = () => {
         body: JSON.stringify({ email: username, password }),
       })
 
-      const data = await res.json()
+      const data = await parseJsonSafe(res)
 
       if (!res.ok) {
         setError(data?.message || 'Login failed')
@@ -54,7 +53,7 @@ const Login = () => {
       navigate('/dashboard', { replace: true })
     } catch (err) {
       console.error(err)
-      setError('Server error')
+      setError(err?.message === 'API URL is not configured' ? 'Server config error: missing API URL' : 'Server error')
       setIsSubmitting(false)
     }
   }

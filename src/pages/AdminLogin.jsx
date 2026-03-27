@@ -2,9 +2,8 @@ import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { FiEye, FiEyeOff } from 'react-icons/fi'
 import { setAuth } from '../utils/auth'
+import { buildApiUrl, parseJsonSafe } from '../utils/apiClient'
 import { useAuthState } from '../hooks/useAuth'
-
-const API_URL = import.meta.env.VITE_API_URL
 
 const AdminLogin = () => {
   const navigate = useNavigate()
@@ -25,7 +24,7 @@ const AdminLogin = () => {
     setError('')
 
     try {
-      const res = await fetch(`${API_URL}/auth/login`, {
+      const res = await fetch(buildApiUrl('/auth/login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -33,7 +32,7 @@ const AdminLogin = () => {
         body: JSON.stringify({ email, password }),
       })
 
-      const data = await res.json()
+      const data = await parseJsonSafe(res)
 
       if (!res.ok) {
         setError(data?.message || 'Login failed')
@@ -60,7 +59,7 @@ const AdminLogin = () => {
       }
     } catch (err) {
       console.error(err)
-      setError('Server error')
+      setError(err?.message === 'API URL is not configured' ? 'Server config error: missing API URL' : 'Server error')
       setIsSubmitting(false)
     }
   }

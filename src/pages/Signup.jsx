@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { FiMail, FiUser, FiLock, FiChevronRight } from 'react-icons/fi'
 import Navbar from '../components/Navbar'
 import { getStoredUser } from '../hooks/useAuth'
+import { buildApiUrl, parseJsonSafe } from '../utils/apiClient'
 
 const API_URL = import.meta.env.VITE_API_URL
 
@@ -29,7 +30,7 @@ const Signup = () => {
     setError('')
 
     try {
-      const res = await fetch(`${API_URL}/auth/register`, {
+      const res = await fetch(buildApiUrl('/auth/register'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -37,7 +38,7 @@ const Signup = () => {
         body: JSON.stringify({ full_name: fullName, email, password }),
       })
 
-      const data = await res.json()
+      const data = await parseJsonSafe(res)
 
       if (!res.ok) {
         setError(data?.message || 'Registration failed')
@@ -50,7 +51,7 @@ const Signup = () => {
       setTimeout(() => navigate('/login', { replace: true }), 1200)
     } catch (err) {
       console.error(err)
-      setError('Server error')
+      setError(err?.message === 'API URL is not configured' ? 'Server config error: missing API URL' : 'Server error')
       setIsSubmitting(false)
     }
   }
