@@ -14,8 +14,10 @@ const AdminLogin = () => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
+  const roleRedirect = '/admin/dashboard'
+
   if (user && ['admin', 'instructor', 'super_admin'].includes(user.role)) {
-    return <Navigate to="/admin/dashboard" replace />
+    return <Navigate to={roleRedirect} replace />
   }
 
   const handleSubmit = async (e) => {
@@ -50,13 +52,7 @@ const AdminLogin = () => {
       }
 
       setAuth(data.token, data.user)
-      if (role === 'super_admin') {
-        navigate('/admin/super-admin-dashboard', { replace: true })
-      } else if (role === 'admin') {
-        navigate('/admin/dashboard', { replace: true })
-      } else if (role === 'instructor') {
-        navigate('/admin/instructor-dashboard', { replace: true })
-      }
+      navigate(roleRedirect, { replace: true })
     } catch (err) {
       console.error(err)
       setError(err?.message === 'API URL is not configured' ? 'Server config error: missing API URL' : 'Server error')

@@ -10,8 +10,6 @@ import Learn from "./pages/Learn";
 import Profile from "./pages/Profile";
 import Search from "./pages/Search";
 import AdminDashboard from "./pages/admin/AdminDashboard";
-import InstructorDashboard from "./pages/admin/InstructorDashboard";
-import SuperAdminDashboard from "./pages/admin/SuperAdminDashboard";
 import AdminLogin from "./pages/AdminLogin";
 import ProtectedUserRoute from "./components/routes/ProtectedUserRoute";
 import ProtectedAdminRoute from "./components/routes/ProtectedAdminRoute";
@@ -55,27 +53,13 @@ function App() {
       <Route
         path="/admin/dashboard"
         element={
-          <ProtectedAdminRoute allowedRoles={["admin", "super_admin"]}>
+          <ProtectedAdminRoute allowedRoles={["admin", "super_admin", "instructor"]}>
             <AdminDashboard />
           </ProtectedAdminRoute>
         }
       />
-      <Route
-        path="/admin/instructor-dashboard"
-        element={
-          <ProtectedAdminRoute allowedRoles={["instructor", "super_admin"]}>
-            <InstructorDashboard />
-          </ProtectedAdminRoute>
-        }
-      />
-      <Route
-        path="/admin/super-admin-dashboard"
-        element={
-          <ProtectedAdminRoute allowedRoles={["super_admin"]}>
-            <SuperAdminDashboard />
-          </ProtectedAdminRoute>
-        }
-      />
+      <Route path="/admin/instructor-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
+      <Route path="/admin/super-admin-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
     </Routes>
   );
 }
