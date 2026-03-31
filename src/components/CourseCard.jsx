@@ -105,7 +105,7 @@ const CourseCard = ({ title, instructor, rating, price, image, description, lear
             onClick={handleAdd}
             className="mt-1 inline-flex rounded-lg bg-[#3B82F6] px-3 py-2 text-xs font-semibold text-white shadow-[0_10px_25px_rgba(59,130,246,0.35)] transition hover:scale-[1.02]"
           >
-            Add to Cart
+            Start Learning
           </button>
         </div>
 

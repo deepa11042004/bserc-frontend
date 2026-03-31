@@ -1,6 +1,12 @@
 import { motion as Motion } from 'framer-motion'
 
 const HeroSection = ({ className = '' }) => {
+  const scrollToSection = (id) => {
+    const el = document.getElementById(id)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   return (
     <section className={`relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#0B0F1A] via-[#0f172a] to-[#111827] px-6 py-10 md:px-12 md:py-14 shadow-[0_20px_60px_rgba(0,0,0,0.45)] ${className}`}>
       <div className="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-[#3B82F6]/25 blur-3xl" />
@@ -14,17 +20,30 @@ const HeroSection = ({ className = '' }) => {
           className="max-w-lg"
         >
           <p className="mb-3 inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-cyan-200">
-            Mission Update
+            Career Mission Control
           </p>
           <h1 className="text-3xl font-semibold leading-tight text-white md:text-5xl">
-            Launch your next skill orbit
+            Build Skills for Space, Robotics & AI Careers
           </h1>
           <p className="mt-4 text-sm leading-relaxed text-slate-300 md:text-base">
-            Build AI and engineering superpowers with guided missions, simulations, and hands-on labs.
+            Learn with mission-style projects aligned to real work in space agencies, robotics labs, and next-gen innovation teams.
           </p>
-          <button className="mt-6 rounded-lg bg-[#3B82F6] px-5 py-3 text-sm font-semibold text-white shadow-[0_15px_35px_rgba(59,130,246,0.35)] transition hover:scale-[1.02]">
-            Start the mission
-          </button>
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => scrollToSection('popular-courses')}
+              className="rounded-lg bg-[#3B82F6] px-5 py-3 text-sm font-semibold text-white shadow-[0_15px_35px_rgba(59,130,246,0.35)] transition hover:scale-[1.02]"
+            >
+              Start Learning 🚀
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToSection('learning-paths')}
+              className="rounded-lg border border-cyan-400/40 bg-white/5 px-5 py-3 text-sm font-semibold text-cyan-100 transition hover:bg-white/10 hover:text-white"
+            >
+              Explore Learning Paths
+            </button>
+          </div>
         </Motion.div>
 
         <Motion.div
@@ -39,7 +58,7 @@ const HeroSection = ({ className = '' }) => {
             className="h-64 w-full rounded-2xl object-cover shadow-[0_30px_60px_rgba(0,0,0,0.55)] md:h-80"
           />
           <div className="absolute -left-4 -top-4 rounded-xl bg-[#0b1224] px-4 py-3 text-xs font-semibold text-cyan-200 shadow-lg shadow-black/40 ring-1 ring-indigo-500/40">
-            1,000+ new lessons this month
+            Live projects mapped to aerospace and robotics roles
           </div>
         </Motion.div>
       </div>

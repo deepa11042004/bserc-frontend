@@ -20,10 +20,10 @@ function SupportingSection() {
                 {/* Heading */}
                 <div className="text-center">
                     <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-                        Supporting the Vision of
+                        Inspired by Global Space & Research Organizations
                     </h2>
                     <p className="mt-2 text-sm text-slate-300">
-                        Partnerships and collaborators championing innovation and exploration.
+                        Our curriculum is aligned with real-world technologies used by leading organizations.
                     </p>
                 </div>
 

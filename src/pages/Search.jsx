@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { FiFilter, FiSearch, FiStar } from 'react-icons/fi'
+import Navbar from '../components/Navbar'
+import Footer from '../components/Footer'
 import {
   aiCourses,
   courseDetailsData,
@@ -100,6 +102,7 @@ const Search = () => {
 
   return (
     <div className="min-h-screen bg-[#0b1220] text-white">
+      <Navbar />
       <div className="mx-auto max-w-6xl px-4 pb-16 pt-10">
         <div className="flex flex-col gap-6">
           <div className="rounded-2xl border border-slate-800 bg-[#0f172a] px-6 py-5 shadow-2xl shadow-black/40">
@@ -175,6 +178,7 @@ const Search = () => {
           )}
         </div>
       </div>
+      <Footer />
     </div>
   )
 }

@@ -11,6 +11,7 @@ import SectionHeader from '../components/SectionHeader'
 import SupportingSection from '../components/SupportingSection'
 import SkeletonCard from '../components/SkeletonCard'
 import TestimonialCard from '../components/TestimonialCard'
+import { useAuthState } from '../hooks/useAuth'
 import {
   aiCourses,
   careerPaths,
@@ -24,6 +25,7 @@ import {
 } from '../data/homeData'
 
 function Home() {
+  const { user } = useAuthState()
   const categorySliderRef = useRef(null)
   const aiSliderRef = useRef(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -41,6 +43,9 @@ function Home() {
   }, [])
 
   const visibleCourses = useMemo(() => (isLoading ? [] : skillsCourses), [isLoading])
+  const isLearner = Boolean(user && user.role === 'user')
+  const continueLearning = visibleCourses.slice(0, 2)
+  const recommendedCourses = visibleCourses.slice(2, 6)
 
   const scrollSlider = (ref, direction, index, setIndex, length) => {
     if (!ref.current) return
@@ -68,13 +73,47 @@ function Home() {
     <div className="min-h-screen bg-black text-white">
       <Navbar links={navLinks} />
 
-      <main className="mx-auto max-w-7xl space-y-14 px-4 pb-8 pt-6 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-7xl space-y-16 px-4 pb-10 pt-6 sm:px-6 lg:px-8">
         <HeroSection />
 
-        <section>
+        <section id="learning-paths" className="py-2">
           <SectionHeader
-            title="Trending courses"
-            subtitle="Hot picks from learners this month."
+            title="Choose Your Learning Path"
+            subtitle="Structured tracks to move from fundamentals to role-ready aerospace and robotics outcomes."
+          />
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {careerPaths.map((path) => (
+              <Motion.article
+                key={path.title}
+                whileHover={{ y: -6, scale: 1.01 }}
+                className="group overflow-hidden rounded-2xl border border-indigo-500/20 bg-[#111827] shadow-[0_10px_30px_rgba(0,0,0,0.4)]"
+              >
+                <div className="h-40 overflow-hidden">
+                  <img
+                    src={path.image}
+                    alt={path.title}
+                    className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                  />
+                </div>
+                <div className="space-y-3 p-4">
+                  <h3 className="text-lg font-semibold text-white">{path.title}</h3>
+                  <p className="text-sm leading-relaxed text-slate-300">{path.description}</p>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-500/20 hover:text-white"
+                  >
+                    Start Path
+                  </button>
+                </div>
+              </Motion.article>
+            ))}
+          </div>
+        </section>
+
+        <section id="popular-courses" className="py-2">
+          <SectionHeader
+            title="Popular Courses"
+            subtitle="Top-rated programs learners are choosing for aerospace, robotics, and AI career growth."
             action="View all"
           />
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -84,13 +123,12 @@ function Home() {
           </div>
         </section>
 
-        <section>
+        <section className="py-2">
           <SectionHeader
-            title="Learn essential career and life skills"
-            subtitle="Choose from focused tracks to start building in-demand knowledge today."
+            title="Specializations"
+            subtitle="Explore focused domains and choose where you want to specialize next."
           />
 
-          {/* Carousel */}
           <div className="relative">
             <div
               ref={categorySliderRef}
@@ -116,9 +154,7 @@ function Home() {
             </div>
           </div>
 
-          {/* Navigation (Arrows + Dots) */}
           <div className="mt-4 flex items-center justify-center gap-4">
-            {/* Left Arrow */}
             <button
               type="button"
               onClick={() =>
@@ -136,8 +172,6 @@ function Home() {
               <FiArrowLeft className="text-[#3B82F6]" />
             </button>
 
-
-            {/* Dots */}
             <div className="flex items-center gap-2">
               {categories.map((_, index) => (
                 <div
@@ -150,7 +184,6 @@ function Home() {
               ))}
             </div>
 
-            {/* Right Arrow */}
             <button
               type="button"
               onClick={() =>
@@ -170,10 +203,10 @@ function Home() {
           </div>
         </section>
 
-        <section>
+        <section className="py-2">
           <SectionHeader
-            title="Learn Robotics with BSERC"
-            subtitle="Short programs designed to help you use AI in your day-to-day work."
+            title="New & Updated Courses"
+            subtitle="Freshly updated modules with current tools, mission workflows, and practical labs."
           />
 
           <div className="mb-4 flex justify-end gap-2">
@@ -228,6 +261,34 @@ function Home() {
             ))}
           </div>
         </section>
+
+        {isLearner && (
+          <section className="space-y-8 py-2">
+            <div>
+              <SectionHeader
+                title="Continue Learning"
+                subtitle="Pick up right where you left off and keep your momentum toward career outcomes."
+              />
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-2">
+                {continueLearning.map((course) => (
+                  <CourseCard key={`continue-${course.title}`} {...course} />
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <SectionHeader
+                title="Recommended for You"
+                subtitle="Based on your current interests in aerospace systems, robotics, and AI applications."
+              />
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                {recommendedCourses.map((course) => (
+                  <CourseCard key={`recommended-${course.title}`} {...course} />
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         <Motion.section
           initial={{ opacity: 0, y: 20 }}
@@ -285,12 +346,12 @@ function Home() {
 
         <SupportingSection />
 
-        <section>
+        <section className="py-2">
           <SectionHeader
-            title="See what others are achieving through learning"
-            subtitle="Real stories from learners who changed careers and accelerated growth."
+            title="Real Learners. Real Career Growth."
+            subtitle="Stories from learners who transitioned into space-tech, automation, and high-impact engineering roles."
           />
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
             {testimonials.map((testimonial) => (
               <TestimonialCard
                 key={testimonial.name}
@@ -330,7 +391,44 @@ function Home() {
           </div>
         </section>
 
-        
+        <Motion.section
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.2 }}
+          className="relative overflow-hidden rounded-3xl border border-cyan-400/20 bg-gradient-to-r from-[#0b1220] via-[#0f172a] to-[#111827] px-6 py-10 text-white shadow-[0_18px_45px_rgba(0,0,0,0.4)]"
+        >
+          <div className="absolute -right-12 -top-10 h-36 w-36 rounded-full bg-cyan-500/20 blur-3xl" />
+          <div className="relative flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
+            <div>
+              <h2 className="text-2xl font-semibold md:text-4xl">Start Your Journey into Space-Tech Today 🚀</h2>
+              <p className="mt-3 max-w-2xl text-sm text-slate-300 md:text-base">
+                Build mission-ready skills in aerospace, robotics, drones, and AI with guided projects and expert instruction.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  const target = document.getElementById('popular-courses')
+                  target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }}
+                className="rounded-lg bg-[#3B82F6] px-5 py-3 text-sm font-semibold text-white transition hover:scale-[1.02]"
+              >
+                Explore Courses
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const target = document.getElementById('learning-paths')
+                  target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }}
+                className="rounded-lg border border-white/30 bg-white/5 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10 hover:text-white"
+              >
+                Get Started
+              </button>
+            </div>
+          </div>
+        </Motion.section>
       </main>
 
       <Footer columns={footerColumns} />

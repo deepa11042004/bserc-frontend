@@ -394,22 +394,29 @@ export const certifications = [
 
 export const careerPaths = [
   {
-    title: 'Aerospace Systems Engineer',
-    description: '140+ lessons • 110+ hours',
+    title: '🚀 Rocket Engineering Path',
+    description: 'Master propulsion, staging, and launch operations through simulation-led modules.',
     image:
-      'https://images.unsplash.com/photo-1473923377535-0002805f57e1?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=900&q=80',
     icon: FaCode,
   },
   {
-    title: 'Robotics & Autonomy Specialist',
-    description: '120+ lessons • 95+ hours',
+    title: '🛰️ Satellite Systems Path',
+    description: 'Learn spacecraft subsystems, telemetry, mission control, and ground station workflows.',
     image:
-      'https://images.unsplash.com/photo-1581091870627-3f5d02597e85?auto=format&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=900&q=80',
     icon: FaRobot,
   },
   {
-    title: 'UAV Pilot & Operations Lead',
-    description: '100+ lessons • 80+ hours',
+    title: '🤖 Robotics Engineer Path',
+    description: 'Build intelligent autonomous systems with control, perception, and mission planning.',
+    image:
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/NASA_Mars_Rover.jpg/960px-NASA_Mars_Rover.jpg',
+    icon: FaUsers,
+  },
+  {
+    title: '🧠 AI for Space Applications',
+    description: 'Apply machine learning to orbital operations, robotics navigation, and mission analytics.',
     image:
       'https://images.unsplash.com/photo-1508615070457-7baeba4003ab?auto=format&fit=crop&w=900&q=80',
     icon: FaUsers,

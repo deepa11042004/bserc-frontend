@@ -127,14 +127,19 @@ const AdminDashboard = () => {
   }
 
   const handleCourseSubmit = async (payload) => {
-    if (editingCourse) {
-      const updated = await courseService.updateCourse(editingCourse.id, payload)
-      setCourses((prev) => prev.map((c) => (c.id === editingCourse.id ? { ...c, ...updated } : c)))
-    } else {
-      const created = await courseService.addCourse(payload)
-      setCourses((prev) => [...prev, created])
+    try {
+      if (editingCourse) {
+        const updated = await courseService.updateCourse(editingCourse.id, payload)
+        setCourses((prev) => prev.map((c) => (c.id === editingCourse.id ? { ...c, ...updated } : c)))
+      } else {
+        const created = await courseService.addCourse(payload)
+        setCourses((prev) => [...prev, created])
+        console.log('Add Course submission successful', created)
+      }
+      setShowCourseModal(false)
+    } catch (error) {
+      console.error('Add Course submission failed', error)
     }
-    setShowCourseModal(false)
   }
 
   const handleSearchConfigUpdate = async (payload) => {
@@ -748,6 +753,7 @@ const AdminDashboard = () => {
       {showCourseModal && (
         <CourseModal
           instructors={instructors}
+          currentUser={user}
           onClose={() => setShowCourseModal(false)}
           onSubmit={handleCourseSubmit}
           initialData={editingCourse}
@@ -798,116 +804,102 @@ const TagManager = ({ tags, onChange, placeholder }) => {
     </div>
   )
 }
-const defaultCourseShape = (instructors) => ({
+const defaultCourseShape = (instructors, currentUser) => ({
   id: '',
-  slug: '',
   title: '',
   subtitle: '',
+  slug: '',
   descriptionShort: '',
   descriptionLong: '',
-  instructorId: instructors[0]?.id || '',
-  instructorTitle: '',
-  thumbnail: '',
-  previewVideo: '',
+  category: '',
+  level: 'Beginner',
   language: 'English',
-  captions: [],
-  categories: [],
-  tags: [],
-  price: { amount: 0, currency: 'INR', discount: { code: '', percent: 0 } },
-  settings: { lifetimeAccess: true, guaranteeText: '', duration: '' },
-  whatYouWillLearn: [],
-  courseIncludes: [],
-  relatedTopics: [],
-  content: [],
-  instructorProfile: { bioShort: '', bioLong: '' },
-  status: 'Draft',
+  price: 0,
+  discountPrice: 0,
+  isPaid: true,
+  thumbnailSmall: '',
+  thumbnailMedium: '',
+  thumbnailLarge: '',
+  previewVideoUrl: '',
+  instructorId: currentUser?.id ? String(currentUser.id) : instructors[0]?.id ? String(instructors[0].id) : '',
+  status: 'published',
+  visibility: 'public',
+  lifetimeAccess: true,
+  certificateAvailable: true,
 })
 
-const CourseModal = ({ initialData, onClose, onSubmit, instructors }) => {
-  const [form, setForm] = useState(() => ({ ...defaultCourseShape(instructors), ...initialData }))
-  const [resourceDrafts, setResourceDrafts] = useState({})
+const normalizeNumberInput = (value, fallback = 0) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+const CourseModal = ({ initialData, onClose, onSubmit, instructors, currentUser }) => {
+  const isInstructorRole = currentUser?.role === 'instructor'
+
+  const [form, setForm] = useState(() => {
+    const base = defaultCourseShape(instructors, currentUser)
+    const initialPrice = Number(initialData?.price?.amount ?? initialData?.price ?? base.price)
+    const directDiscountPrice = Number(initialData?.discountPrice ?? initialData?.discount_price)
+    const legacyDiscountPercent = Number(initialData?.price?.discount?.percent || 0)
+    const derivedDiscountPrice = Number.isFinite(directDiscountPrice)
+      ? directDiscountPrice
+      : legacyDiscountPercent > 0 && Number.isFinite(initialPrice)
+        ? Number((initialPrice - (initialPrice * legacyDiscountPercent) / 100).toFixed(2))
+        : base.discountPrice
+
+    return {
+      ...base,
+      ...initialData,
+      category: initialData?.category || initialData?.categories?.[0] || base.category,
+      price: Number.isFinite(initialPrice) ? initialPrice : base.price,
+      discountPrice: Number.isFinite(derivedDiscountPrice) ? derivedDiscountPrice : base.discountPrice,
+      isPaid: initialData?.isPaid ?? initialData?.is_paid ?? (Number.isFinite(initialPrice) ? initialPrice > 0 : base.isPaid),
+      thumbnailSmall: initialData?.thumbnailSmall || initialData?.thumbnail_small || initialData?.thumbnail || base.thumbnailSmall,
+      thumbnailMedium: initialData?.thumbnailMedium || initialData?.thumbnail_medium || initialData?.thumbnail || base.thumbnailMedium,
+      thumbnailLarge: initialData?.thumbnailLarge || initialData?.thumbnail_large || initialData?.thumbnail || base.thumbnailLarge,
+      previewVideoUrl: initialData?.previewVideoUrl || initialData?.preview_video_url || initialData?.previewVideo || base.previewVideoUrl,
+      instructorId: String(initialData?.instructorId || initialData?.instructor_id || base.instructorId || ''),
+      status: String(initialData?.status || base.status).toLowerCase(),
+      visibility: String(initialData?.visibility || base.visibility).toLowerCase(),
+      lifetimeAccess: initialData?.lifetimeAccess ?? initialData?.lifetime_access ?? base.lifetimeAccess,
+      certificateAvailable: initialData?.certificateAvailable ?? initialData?.certificate_available ?? base.certificateAvailable,
+    }
+  })
+
+  useEffect(() => {
+    if (!isInstructorRole || !currentUser?.id) return
+    setForm((prev) => ({ ...prev, instructorId: String(currentUser.id) }))
+  }, [isInstructorRole, currentUser?.id])
 
   const updateField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
 
-  const updateNested = (key, value) => setForm((prev) => ({ ...prev, [key]: { ...prev[key], ...value } }))
-
-  const updateArray = (key, next) => setForm((prev) => ({ ...prev, [key]: next }))
-
-  const addModule = () => {
-    setForm((prev) => ({
-      ...prev,
-      content: [...prev.content, { id: `m-${Date.now()}`, title: 'New module', lectures: [] }],
-    }))
-  }
-
-  const updateModule = (moduleId, updater) => {
-    setForm((prev) => ({
-      ...prev,
-      content: prev.content.map((m) => (m.id === moduleId ? updater(m) : m)),
-    }))
-  }
-
-  const removeModule = (moduleId) => setForm((prev) => ({ ...prev, content: prev.content.filter((m) => m.id !== moduleId) }))
-
-  const addLecture = (moduleId) => {
-    updateModule(moduleId, (m) => ({
-      ...m,
-      lectures: [
-        ...m.lectures,
-        { id: `l-${Date.now()}`, title: 'New lesson', duration: '', thumbnail: '', isPreview: false, resources: [] },
-      ],
-    }))
-  }
-
-  const updateLecture = (moduleId, lectureId, updater) => {
-    updateModule(moduleId, (m) => ({
-      ...m,
-      lectures: m.lectures.map((l) => (l.id === lectureId ? updater(l) : l)),
-    }))
-  }
-
-  const removeLecture = (moduleId, lectureId) => {
-    updateModule(moduleId, (m) => ({ ...m, lectures: m.lectures.filter((l) => l.id !== lectureId) }))
-  }
-
-  const updateResourceDraft = (lectureId, patch) =>
-    setResourceDrafts((prev) => ({ ...prev, [lectureId]: { ...prev[lectureId], ...patch } }))
-
-  const addResource = (moduleId, lectureId) => {
-    const draft = resourceDrafts[lectureId] || { type: 'pdf', label: '', url: '' }
-    if (!draft.label || !draft.url) return
-    updateLecture(moduleId, lectureId, (lec) => ({
-      ...lec,
-      resources: [...(lec.resources || []), { type: draft.type || 'pdf', label: draft.label, url: draft.url }],
-    }))
-    updateResourceDraft(lectureId, { label: '', url: '' })
-  }
-
-  const removeResource = (moduleId, lectureId, idx) => {
-    updateLecture(moduleId, lectureId, (lec) => ({
-      ...lec,
-      resources: lec.resources.filter((_, i) => i !== idx),
-    }))
-  }
-
   const handleSubmit = (e) => {
     e.preventDefault()
+
     const normalized = {
-      ...form,
-      price: {
-        amount: Number(form.price?.amount || 0),
-        currency: form.price?.currency || 'INR',
-        discount: {
-          code: form.price?.discount?.code || '',
-          percent: Number(form.price?.discount?.percent || 0),
-        },
-      },
-      settings: {
-        lifetimeAccess: Boolean(form.settings?.lifetimeAccess),
-        guaranteeText: form.settings?.guaranteeText || '',
-        duration: form.settings?.duration || '',
-      },
+      title: (form.title || '').trim(),
+      subtitle: (form.subtitle || '').trim(),
+      slug: (form.slug || '').trim(),
+      descriptionShort: (form.descriptionShort || '').trim(),
+      descriptionLong: (form.descriptionLong || '').trim(),
+      category: (form.category || '').trim(),
+      level: form.level || 'Beginner',
+      language: (form.language || 'English').trim(),
+      price: form.isPaid ? normalizeNumberInput(form.price, 0) : 0,
+      discountPrice: form.isPaid ? normalizeNumberInput(form.discountPrice, 0) : null,
+      isPaid: Boolean(form.isPaid),
+      thumbnailSmall: (form.thumbnailSmall || '').trim(),
+      thumbnailMedium: (form.thumbnailMedium || '').trim(),
+      thumbnailLarge: (form.thumbnailLarge || '').trim(),
+      previewVideoUrl: (form.previewVideoUrl || '').trim(),
+      instructorId: form.instructorId ? Number.parseInt(form.instructorId, 10) : '',
+      status: (form.status || 'published').toLowerCase(),
+      visibility: (form.visibility || 'public').toLowerCase(),
+      lifetimeAccess: Boolean(form.lifetimeAccess),
+      certificateAvailable: Boolean(form.certificateAvailable),
+      currency: 'INR',
     }
+
     onSubmit(normalized)
   }
 
@@ -917,180 +909,141 @@ const CourseModal = ({ initialData, onClose, onSubmit, instructors }) => {
         <Section title="Basic information">
           <div className="grid gap-3 md:grid-cols-2">
             <Field label="Title" value={form.title} onChange={(v) => updateField('title', v)} required />
-            <Field label="Slug" value={form.slug} onChange={(v) => updateField('slug', v)} helper="Auto if left blank" />
+            <Field label="Slug" value={form.slug} onChange={(v) => updateField('slug', v)} helper="Leave blank to auto-generate" />
             <Field label="Subtitle" value={form.subtitle} onChange={(v) => updateField('subtitle', v)} />
-            <Field label="Short description" value={form.descriptionShort} onChange={(v) => updateField('descriptionShort', v)} />
+            <Field label="Category" value={form.category} onChange={(v) => updateField('category', v)} helper="Example: Aerospace" />
           </div>
-          <Textarea label="Long description" value={form.descriptionLong} onChange={(v) => updateField('descriptionLong', v)} />
-        </Section>
 
-        <Section title="Instructor">
           <div className="grid gap-3 md:grid-cols-2">
             <label className="space-y-1 text-slate-300">
-              <span>Instructor</span>
+              <span>Level</span>
               <select
-                value={form.instructorId}
-                onChange={(e) => updateField('instructorId', e.target.value)}
+                value={form.level}
+                onChange={(e) => updateField('level', e.target.value)}
                 className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-white outline-none focus:border-indigo-600"
               >
-                {instructors.map((inst) => (
-                  <option key={inst.id} value={inst.id} className="bg-slate-900">
-                    {inst.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <Field label="Instructor title" value={form.instructorTitle} onChange={(v) => updateField('instructorTitle', v)} />
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            <Textarea label="Instructor bio (short)" value={form.instructorProfile?.bioShort || ''} onChange={(v) => updateNested('instructorProfile', { bioShort: v })} />
-            <Textarea label="Instructor bio (long)" value={form.instructorProfile?.bioLong || ''} onChange={(v) => updateNested('instructorProfile', { bioLong: v })} />
-          </div>
-        </Section>
-
-        <Section title="Media">
-          <div className="grid gap-3 md:grid-cols-2">
-            <Field label="Thumbnail URL" value={form.thumbnail} onChange={(v) => updateField('thumbnail', v)} />
-            <Field label="Preview video URL" value={form.previewVideo} onChange={(v) => updateField('previewVideo', v)} />
-          </div>
-        </Section>
-
-        <Section title="Course settings">
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="space-y-1 text-slate-300">
-              <span>Language</span>
-              <select
-                value={form.language}
-                onChange={(e) => updateField('language', e.target.value)}
-                className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-white outline-none focus:border-indigo-600"
-              >
-                {['English', 'Hindi', 'Spanish'].map((opt) => (
+                {['Beginner', 'Intermediate', 'Advanced'].map((opt) => (
                   <option key={opt} value={opt} className="bg-slate-900">
                     {opt}
                   </option>
                 ))}
               </select>
             </label>
-            <Field label="Duration" value={form.settings?.duration || ''} onChange={(v) => updateNested('settings', { duration: v })} helper="e.g., 12h 30m" />
+
+            <Field label="Language" value={form.language} onChange={(v) => updateField('language', v)} />
           </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <Textarea label="Short description" value={form.descriptionShort} onChange={(v) => updateField('descriptionShort', v)} />
+            <Textarea label="Long description" value={form.descriptionLong} onChange={(v) => updateField('descriptionLong', v)} />
+          </div>
+        </Section>
+
+        <Section title="Pricing and access">
           <div className="grid gap-3 md:grid-cols-3">
-            <ChipInput label="Captions" values={form.captions} onChange={(vals) => updateArray('captions', vals)} placeholder="Add caption language" />
-            <ChipInput label="Categories" values={form.categories} onChange={(vals) => updateArray('categories', vals)} placeholder="Add category" />
-            <ChipInput label="Tags" values={form.tags} onChange={(vals) => updateArray('tags', vals)} placeholder="Add tag" />
-          </div>
-          <div className="grid gap-3 md:grid-cols-3 items-center">
             <label className="flex items-center gap-2 text-slate-200">
               <input
                 type="checkbox"
-                checked={!!form.settings?.lifetimeAccess}
-                onChange={(e) => updateNested('settings', { lifetimeAccess: e.target.checked })}
+                checked={!!form.isPaid}
+                onChange={(e) => updateField('isPaid', e.target.checked)}
+                className="h-4 w-4 rounded border-slate-600 bg-slate-900"
+              />
+              <span>Paid course</span>
+            </label>
+            <Field label="Price" type="number" value={form.price} onChange={(v) => updateField('price', v)} />
+            <Field label="Discount price" type="number" value={form.discountPrice} onChange={(v) => updateField('discountPrice', v)} />
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="flex items-center gap-2 text-slate-200">
+              <input
+                type="checkbox"
+                checked={!!form.lifetimeAccess}
+                onChange={(e) => updateField('lifetimeAccess', e.target.checked)}
                 className="h-4 w-4 rounded border-slate-600 bg-slate-900"
               />
               <span>Lifetime access</span>
             </label>
-            <Field label="Guarantee text" value={form.settings?.guaranteeText || ''} onChange={(v) => updateNested('settings', { guaranteeText: v })} />
-            <div />
+
+            <label className="flex items-center gap-2 text-slate-200">
+              <input
+                type="checkbox"
+                checked={!!form.certificateAvailable}
+                onChange={(e) => updateField('certificateAvailable', e.target.checked)}
+                className="h-4 w-4 rounded border-slate-600 bg-slate-900"
+              />
+              <span>Certificate available</span>
+            </label>
           </div>
         </Section>
 
-        <Section title="Pricing">
-          <div className="grid gap-3 md:grid-cols-3">
-            <Field label="Amount" type="number" value={form.price?.amount ?? 0} onChange={(v) => updateNested('price', { amount: v })} />
-            <Field label="Currency" value={form.price?.currency || 'INR'} onChange={(v) => updateNested('price', { currency: v })} />
-            <Field label="Coupon code" value={form.price?.discount?.code || ''} onChange={(v) => updateNested('price', { discount: { ...(form.price?.discount || {}), code: v } })} />
-          </div>
-          <div className="grid gap-3 md:grid-cols-3">
-            <Field label="Percent off" type="number" value={form.price?.discount?.percent ?? 0} onChange={(v) => updateNested('price', { discount: { ...(form.price?.discount || {}), percent: v } })} />
+        <Section title="Media">
+          <div className="grid gap-3 md:grid-cols-2">
+            <Field label="Thumbnail (small)" value={form.thumbnailSmall} onChange={(v) => updateField('thumbnailSmall', v)} />
+            <Field label="Thumbnail (medium)" value={form.thumbnailMedium} onChange={(v) => updateField('thumbnailMedium', v)} />
+            <Field label="Thumbnail (large)" value={form.thumbnailLarge} onChange={(v) => updateField('thumbnailLarge', v)} />
+            <Field label="Preview video URL" value={form.previewVideoUrl} onChange={(v) => updateField('previewVideoUrl', v)} />
           </div>
         </Section>
 
-        <Section title="Outcomes and content">
+        <Section title="Ownership and publish settings">
           <div className="grid gap-3 md:grid-cols-3">
-            <ChipInput label="What you will learn" values={form.whatYouWillLearn} onChange={(vals) => updateArray('whatYouWillLearn', vals)} placeholder="Add bullet" />
-            <ChipInput label="Course includes" values={form.courseIncludes} onChange={(vals) => updateArray('courseIncludes', vals)} placeholder="Add include" />
-            <ChipInput label="Related topics" values={form.relatedTopics} onChange={(vals) => updateArray('relatedTopics', vals)} placeholder="Add topic" />
-          </div>
-          <div className="mt-4 space-y-3 rounded-xl border border-slate-800 bg-slate-900/40 p-3">
-            <div className="flex items-center justify-between text-slate-200">
-              <span className="font-semibold">Modules & lessons</span>
-              <button type="button" onClick={addModule} className="rounded-lg border border-slate-700 px-3 py-1 text-xs transition hover:border-indigo-500 hover:text-indigo-200">
-                + Add module
-              </button>
-            </div>
-            {form.content.length === 0 && <div className="text-sm text-slate-400">No modules yet.</div>}
-            {form.content.map((module) => (
-              <div key={module.id} className="rounded-lg border border-slate-800 bg-[#0f172a] p-3 space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <input
-                    value={module.title}
-                    onChange={(e) => updateModule(module.id, (m) => ({ ...m, title: e.target.value }))}
-                    className="flex-1 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
-                    placeholder="Module title"
-                  />
-                  <div className="flex gap-2">
-                    <button type="button" onClick={() => addLecture(module.id)} className="rounded-full border border-slate-700 px-3 py-2 text-xs text-slate-200 hover:border-indigo-500">+ Lesson</button>
-                    <button type="button" onClick={() => removeModule(module.id)} className="rounded-full border border-slate-700 px-3 py-2 text-xs text-slate-200 hover:border-red-500">Delete</button>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  {module.lectures.map((lecture) => (
-                    <div key={lecture.id} className="rounded border border-slate-800 bg-slate-900/60 p-3 space-y-2">
-                      <div className="grid gap-2 md:grid-cols-3">
-                        <Field label="Lesson title" value={lecture.title} onChange={(v) => updateLecture(module.id, lecture.id, (l) => ({ ...l, title: v }))} />
-                        <Field label="Duration" value={lecture.duration} onChange={(v) => updateLecture(module.id, lecture.id, (l) => ({ ...l, duration: v }))} helper="e.g., 05:30" />
-                        <Field label="Thumbnail" value={lecture.thumbnail} onChange={(v) => updateLecture(module.id, lecture.id, (l) => ({ ...l, thumbnail: v }))} />
-                      </div>
-                      <label className="flex items-center gap-2 text-xs text-slate-200">
-                        <input
-                          type="checkbox"
-                          checked={!!lecture.isPreview}
-                          onChange={(e) => updateLecture(module.id, lecture.id, (l) => ({ ...l, isPreview: e.target.checked }))}
-                          className="h-4 w-4 rounded border-slate-600 bg-slate-900"
-                        />
-                        Mark as free preview
-                      </label>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-xs text-slate-300">
-                          <span>Resources</span>
-                          <button type="button" onClick={() => removeLecture(module.id, lecture.id)} className="text-red-400 hover:text-red-300">Remove lesson</button>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {(lecture.resources || []).map((res, idx) => (
-                            <span key={`${lecture.id}-${idx}`} className="flex items-center gap-2 rounded-full bg-indigo-900/30 px-3 py-1 text-xs text-indigo-100">
-                              {res.type}: {res.label}
-                              <button type="button" onClick={() => removeResource(module.id, lecture.id, idx)} className="text-slate-300 hover:text-white">×</button>
-                            </span>
-                          ))}
-                        </div>
-                        <div className="grid gap-2 md:grid-cols-3">
-                          <label className="text-xs text-slate-300">
-                            Type
-                            <select
-                              value={resourceDrafts[lecture.id]?.type || 'pdf'}
-                              onChange={(e) => updateResourceDraft(lecture.id, { type: e.target.value })}
-                              className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-white"
-                            >
-                              <option value="pdf" className="bg-slate-900">PDF</option>
-                              <option value="link" className="bg-slate-900">Link</option>
-                              <option value="file" className="bg-slate-900">File</option>
-                            </select>
-                          </label>
-                          <Field label="Label" value={resourceDrafts[lecture.id]?.label || ''} onChange={(v) => updateResourceDraft(lecture.id, { label: v })} small />
-                          <Field label="URL" value={resourceDrafts[lecture.id]?.url || ''} onChange={(v) => updateResourceDraft(lecture.id, { url: v })} small />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => addResource(module.id, lecture.id)}
-                          className="rounded border border-slate-700 px-3 py-1 text-xs text-slate-200 transition hover:border-indigo-500"
-                        >
-                          Add resource
-                        </button>
-                      </div>
-                    </div>
+            {isInstructorRole ? (
+              <label className="space-y-1 text-slate-300 md:col-span-1">
+                <span>Instructor ID</span>
+                <input
+                  readOnly
+                  value={form.instructorId}
+                  className="w-full rounded-lg border border-slate-800 bg-slate-800/80 px-3 py-2 text-white outline-none"
+                />
+                <div className="text-xs text-slate-500">Auto-assigned from your account.</div>
+              </label>
+            ) : (
+              <label className="space-y-1 text-slate-300 md:col-span-1">
+                <span>Instructor</span>
+                <select
+                  value={form.instructorId}
+                  onChange={(e) => updateField('instructorId', e.target.value)}
+                  className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-white outline-none focus:border-indigo-600"
+                >
+                  {instructors.map((inst) => (
+                    <option key={inst.id} value={inst.id} className="bg-slate-900">
+                      {inst.name}
+                    </option>
                   ))}
-                </div>
-              </div>
-            ))}
+                </select>
+              </label>
+            )}
+
+            <label className="space-y-1 text-slate-300">
+              <span>Status</span>
+              <select
+                value={form.status}
+                onChange={(e) => updateField('status', e.target.value)}
+                className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-white outline-none focus:border-indigo-600"
+              >
+                {['published', 'draft', 'pending'].map((opt) => (
+                  <option key={opt} value={opt} className="bg-slate-900">
+                    {opt}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="space-y-1 text-slate-300">
+              <span>Visibility</span>
+              <select
+                value={form.visibility}
+                onChange={(e) => updateField('visibility', e.target.value)}
+                className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-white outline-none focus:border-indigo-600"
+              >
+                {['public', 'private', 'unlisted'].map((opt) => (
+                  <option key={opt} value={opt} className="bg-slate-900">
+                    {opt}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
         </Section>
 
