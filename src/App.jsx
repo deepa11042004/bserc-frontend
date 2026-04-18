@@ -10,9 +10,22 @@ import Learn from "./pages/Learn";
 import Profile from "./pages/Profile";
 import Search from "./pages/Search";
 import AdminDashboard from "./pages/admin/AdminDashboard";
+import SuperAdminDashboard from "./pages/admin/SuperAdminDashboard";
 import AdminLogin from "./pages/AdminLogin";
 import ProtectedUserRoute from "./components/routes/ProtectedUserRoute";
 import ProtectedAdminRoute from "./components/routes/ProtectedAdminRoute";
+import { getUser } from "./utils/auth";
+
+const AdminEntryRedirect = () => {
+  const user = getUser()
+
+  if (!user || !user.role) {
+    return <Navigate to="/admin/login" replace />
+  }
+
+  const path = user.role === "super_admin" ? "/admin/super-admin-dashboard" : "/admin/dashboard"
+  return <Navigate to={path} replace />
+}
 
 function App() {
   return (
@@ -49,17 +62,24 @@ function App() {
       />
       <Route path="/search" element={<Search />} />
       <Route path="/admin/login" element={<AdminLogin />} />
-      <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+      <Route path="/admin" element={<AdminEntryRedirect />} />
       <Route
         path="/admin/dashboard"
         element={
-          <ProtectedAdminRoute allowedRoles={["admin", "super_admin", "instructor"]}>
+          <ProtectedAdminRoute allowedRoles={["admin", "instructor"]}>
             <AdminDashboard />
           </ProtectedAdminRoute>
         }
       />
       <Route path="/admin/instructor-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
-      <Route path="/admin/super-admin-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
+      <Route
+        path="/admin/super-admin-dashboard"
+        element={
+          <ProtectedAdminRoute allowedRoles={["super_admin"]}>
+            <SuperAdminDashboard />
+          </ProtectedAdminRoute>
+        }
+      />
     </Routes>
   );
 }

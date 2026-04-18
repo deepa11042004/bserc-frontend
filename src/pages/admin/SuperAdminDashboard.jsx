@@ -1,8 +1,2212 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import {
+  BarChart3,
+  Bell,
+  BookOpenCheck,
+  CheckCircle2,
+  Clock3,
+  FolderKanban,
+  Headset,
+  HelpCircle,
+  LayoutDashboard,
+  Megaphone,
+  Pencil,
+  PlayCircle,
+  Plus,
+  RefreshCw,
+  Search,
+  Settings,
+  ShieldCheck,
+  Trash2,
+  UploadCloud,
+  UserCheck,
+} from 'lucide-react'
+import SuperAdminSidebar from '../../components/superAdmin/SuperAdminSidebar'
+import SuperAdminTopbar from '../../components/superAdmin/SuperAdminTopbar'
+import SuperAdminMetricCard from '../../components/superAdmin/SuperAdminMetricCard'
+import { lmsAdminService } from '../../services/lmsAdminService'
+import { useAuthState } from '../../hooks/useAuth'
+import { logoutAdmin } from '../../utils/auth'
+
+const WORKSHOP_DRAFT_KEY = 'bserc-lms-super-admin-workshop-draft-v1'
+
+const SECTION_IDS = {
+  OVERVIEW: 'overview',
+  ALL_WORKSHOPS: 'all-workshops',
+  CREATE_WORKSHOP: 'create-workshop',
+  ALL_MODULES: 'all-modules',
+  CREATE_MODULE: 'create-module',
+  ALL_VIDEOS: 'all-videos',
+  UPLOAD_VIDEO: 'upload-video',
+  UPLOAD_CENTER: 'upload-center',
+  UPLOAD_PROGRESS: 'upload-progress',
+  MEDIA_LIBRARY: 'media-library',
+  ALL_STUDENTS: 'all-students',
+  ENROLLED_STUDENTS: 'enrolled-students',
+  GRANT_ACCESS: 'grant-access',
+  REVOKE_ACCESS: 'revoke-access',
+  ANALYTICS_OVERVIEW: 'analytics-overview',
+  WORKSHOP_PERFORMANCE: 'workshop-performance',
+  VIDEO_ENGAGEMENT: 'video-engagement',
+  ANNOUNCEMENTS: 'announcements',
+  NOTIFICATIONS: 'notifications',
+  ADMIN_PROFILE: 'admin-profile',
+  PLATFORM_SETTINGS: 'platform-settings',
+  PERMISSIONS: 'permissions',
+  HELP_DESK: 'help-desk',
+  FAQ_MANAGEMENT: 'faq-management',
+}
+
+const INITIAL_WORKSHOP_FORM = {
+  title: '',
+  description: '',
+  status: 'draft',
+  originalWorkshopId: '',
+  thumbnailFile: null,
+}
+
+const INITIAL_UPLOAD_FORM = {
+  workshopId: '',
+  moduleId: '',
+  title: '',
+  description: '',
+  duration: '',
+  order: '',
+  videoFiles: [],
+  thumbnailFile: null,
+}
+
+const INITIAL_SNAPSHOT = {
+  workshops: [],
+  accessEntries: [],
+  uploadJobs: [],
+  settings: {
+    profile: {
+      displayName: '',
+      email: '',
+      designation: '',
+      notificationsEmail: '',
+    },
+    storage: {
+      provider: 'Blob Storage',
+      maxUploadMb: 1024,
+      allowedFormats: 'mp4,mov,webm',
+      retentionDays: 365,
+    },
+    permissions: {
+      allowManualAccessGrant: true,
+      enableMultiAdminPreview: false,
+      writeAuditLog: true,
+    },
+  },
+  activityLogs: [],
+  liveWorkshops: [],
+  metrics: {
+    totalWorkshops: 0,
+    totalVideos: 0,
+    totalStudents: 0,
+    recentUploads: 0,
+  },
+  analytics: {
+    workshopViews: [],
+    topVideos: [],
+    engagement: {
+      totalViews: 0,
+      totalCompletions: 0,
+      completionRatio: 0,
+    },
+  },
+}
+
+const formatDateTime = (value) => {
+  if (!value) return '—'
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+
+  return date.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+const formatFileSize = (bytes = 0) => {
+  const value = Number(bytes)
+  if (!Number.isFinite(value) || value <= 0) return '0 B'
+
+  if (value < 1024) return `${value} B`
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`
+  if (value < 1024 * 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`
+  return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GB`
+}
+
+const stripFileExtension = (name = '') => {
+  const index = name.lastIndexOf('.')
+  if (index <= 0) return name
+  return name.slice(0, index)
+}
+
+const sleep = (ms = 200) => new Promise((resolve) => setTimeout(resolve, ms))
+
 const SuperAdminDashboard = () => {
+  const navigate = useNavigate()
+  const { user } = useAuthState()
+
+  const [activeSection, setActiveSection] = useState(SECTION_IDS.OVERVIEW)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [snapshot, setSnapshot] = useState(INITIAL_SNAPSHOT)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+
+  const [workshopForm, setWorkshopForm] = useState(INITIAL_WORKSHOP_FORM)
+  const [workshopThumbPreview, setWorkshopThumbPreview] = useState('')
+  const [editingWorkshopId, setEditingWorkshopId] = useState(null)
+  const [workshopSearch, setWorkshopSearch] = useState('')
+  const [workshopStatusFilter, setWorkshopStatusFilter] = useState('all')
+  const [draftSavedAt, setDraftSavedAt] = useState('')
+
+  const [moduleWorkshopId, setModuleWorkshopId] = useState('')
+  const [selectedModuleId, setSelectedModuleId] = useState('')
+  const [newModuleTitle, setNewModuleTitle] = useState('')
+  const [videoSearch, setVideoSearch] = useState('')
+  const [dragModuleIndex, setDragModuleIndex] = useState(null)
+  const [dragVideoIndex, setDragVideoIndex] = useState(null)
+
+  const [accessWorkshopId, setAccessWorkshopId] = useState('')
+  const [manualAccessForm, setManualAccessForm] = useState({ fullName: '', email: '', userId: '' })
+  const [sourceParticipants, setSourceParticipants] = useState([])
+  const [participantsLoading, setParticipantsLoading] = useState(false)
+
+  const [uploadForm, setUploadForm] = useState(INITIAL_UPLOAD_FORM)
+  const [uploadPreviewUrl, setUploadPreviewUrl] = useState('')
+  const [uploadThumbPreviewUrl, setUploadThumbPreviewUrl] = useState('')
+  const [previewJobId, setPreviewJobId] = useState('')
+
+  const [settingsDraft, setSettingsDraft] = useState(INITIAL_SNAPSHOT.settings)
+
+  const setFlash = (message) => {
+    setNotice(message)
+
+    window.setTimeout(() => {
+      setNotice((prev) => (prev === message ? '' : prev))
+    }, 2800)
+  }
+
+  const loadSnapshot = async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true)
+    setError('')
+
+    try {
+      const next = await lmsAdminService.getDashboardSnapshot()
+      setSnapshot(next)
+      setSettingsDraft(next.settings)
+    } catch (err) {
+      console.error(err)
+      setError(err?.message || 'Failed to load super admin dashboard data.')
+    } finally {
+      if (!silent) setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void loadSnapshot()
+  }, [])
+
+  useEffect(() => {
+    if (!snapshot.workshops.length) {
+      setModuleWorkshopId('')
+      setAccessWorkshopId('')
+      setUploadForm((prev) => ({ ...prev, workshopId: '', moduleId: '' }))
+      return
+    }
+
+    setModuleWorkshopId((prev) => {
+      const valid = snapshot.workshops.some((workshop) => workshop.id === prev)
+      return valid ? prev : snapshot.workshops[0].id
+    })
+
+    setAccessWorkshopId((prev) => {
+      const valid = snapshot.workshops.some((workshop) => workshop.id === prev)
+      return valid ? prev : snapshot.workshops[0].id
+    })
+
+    setUploadForm((prev) => {
+      const workshopId = snapshot.workshops.some((workshop) => workshop.id === prev.workshopId)
+        ? prev.workshopId
+        : snapshot.workshops[0].id
+
+      const workshop = snapshot.workshops.find((item) => item.id === workshopId)
+      const moduleId = workshop?.modules.some((module) => module.id === prev.moduleId)
+        ? prev.moduleId
+        : workshop?.modules?.[0]?.id || ''
+
+      if (workshopId === prev.workshopId && moduleId === prev.moduleId) return prev
+      return { ...prev, workshopId, moduleId }
+    })
+  }, [snapshot.workshops])
+
+  useEffect(() => {
+    if (!moduleWorkshopId) {
+      setSelectedModuleId('')
+      return
+    }
+
+    const selectedWorkshop = snapshot.workshops.find((workshop) => workshop.id === moduleWorkshopId)
+    if (!selectedWorkshop) {
+      setSelectedModuleId('')
+      return
+    }
+
+    setSelectedModuleId((prev) => {
+      const valid = selectedWorkshop.modules.some((module) => module.id === prev)
+      return valid ? prev : selectedWorkshop.modules?.[0]?.id || ''
+    })
+  }, [moduleWorkshopId, snapshot.workshops])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    try {
+      const raw = window.localStorage.getItem(WORKSHOP_DRAFT_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+
+      setWorkshopForm((prev) => ({
+        ...prev,
+        title: parsed.title || prev.title,
+        description: parsed.description || prev.description,
+        status: parsed.status || prev.status,
+        originalWorkshopId: parsed.originalWorkshopId || prev.originalWorkshopId,
+      }))
+    } catch {
+      // Ignore invalid draft values.
+    }
+  }, [])
+
+  useEffect(() => {
+    if (editingWorkshopId) return
+    if (typeof window === 'undefined') return
+
+    const draftPayload = {
+      title: workshopForm.title,
+      description: workshopForm.description,
+      status: workshopForm.status,
+      originalWorkshopId: workshopForm.originalWorkshopId,
+    }
+
+    window.localStorage.setItem(WORKSHOP_DRAFT_KEY, JSON.stringify(draftPayload))
+    setDraftSavedAt(new Date().toISOString())
+  }, [workshopForm.title, workshopForm.description, workshopForm.status, workshopForm.originalWorkshopId, editingWorkshopId])
+
+  useEffect(() => {
+    if (!uploadForm.videoFiles.length) {
+      setUploadPreviewUrl('')
+      return undefined
+    }
+
+    const preview = URL.createObjectURL(uploadForm.videoFiles[0])
+    setUploadPreviewUrl(preview)
+
+    return () => URL.revokeObjectURL(preview)
+  }, [uploadForm.videoFiles])
+
+  useEffect(() => {
+    if (!uploadForm.thumbnailFile) {
+      setUploadThumbPreviewUrl('')
+      return undefined
+    }
+
+    const preview = URL.createObjectURL(uploadForm.thumbnailFile)
+    setUploadThumbPreviewUrl(preview)
+
+    return () => URL.revokeObjectURL(preview)
+  }, [uploadForm.thumbnailFile])
+
+  const sidebarSections = useMemo(
+    () => [
+      {
+        title: 'Dashboard',
+        collapsible: false,
+        items: [
+          {
+            id: SECTION_IDS.OVERVIEW,
+            label: 'Overview',
+            icon: LayoutDashboard,
+          },
+        ],
+      },
+      {
+        title: 'Content Management',
+        collapsible: true,
+        items: [
+          {
+            id: SECTION_IDS.ALL_WORKSHOPS,
+            label: 'All Workshops',
+            icon: BookOpenCheck,
+            badge: snapshot.workshops.length,
+          },
+          {
+            id: SECTION_IDS.CREATE_WORKSHOP,
+            label: 'Create Workshop',
+            icon: Plus,
+          },
+          {
+            id: SECTION_IDS.ALL_MODULES,
+            label: 'All Modules',
+            icon: FolderKanban,
+          },
+          {
+            id: SECTION_IDS.CREATE_MODULE,
+            label: 'Create Module',
+            icon: Plus,
+          },
+          {
+            id: SECTION_IDS.ALL_VIDEOS,
+            label: 'All Videos',
+            icon: PlayCircle,
+          },
+          {
+            id: SECTION_IDS.UPLOAD_VIDEO,
+            label: 'Upload Video',
+            icon: UploadCloud,
+          },
+        ],
+      },
+      {
+        title: 'Media Management',
+        collapsible: true,
+        items: [
+          {
+            id: SECTION_IDS.UPLOAD_CENTER,
+            label: 'Upload Center',
+            icon: UploadCloud,
+            badge: snapshot.uploadJobs.filter((job) => job.status === 'uploading' || job.status === 'queued').length,
+          },
+          {
+            id: SECTION_IDS.UPLOAD_PROGRESS,
+            label: 'Upload Progress',
+            icon: Clock3,
+          },
+          {
+            id: SECTION_IDS.MEDIA_LIBRARY,
+            label: 'Media Library',
+            icon: FolderKanban,
+          },
+        ],
+      },
+      {
+        title: 'Student Management',
+        collapsible: true,
+        items: [
+          {
+            id: SECTION_IDS.ALL_STUDENTS,
+            label: 'All Students',
+            icon: UserCheck,
+          },
+          {
+            id: SECTION_IDS.ENROLLED_STUDENTS,
+            label: 'Enrolled Students',
+            icon: UserCheck,
+          },
+          {
+            id: SECTION_IDS.GRANT_ACCESS,
+            label: 'Grant Access',
+            icon: CheckCircle2,
+          },
+          {
+            id: SECTION_IDS.REVOKE_ACCESS,
+            label: 'Revoke Access',
+            icon: Trash2,
+          },
+        ],
+      },
+      {
+        title: 'Analytics',
+        collapsible: true,
+        items: [
+          {
+            id: SECTION_IDS.ANALYTICS_OVERVIEW,
+            label: 'Overview Analytics',
+            icon: BarChart3,
+          },
+          {
+            id: SECTION_IDS.WORKSHOP_PERFORMANCE,
+            label: 'Workshop Performance',
+            icon: BarChart3,
+          },
+          {
+            id: SECTION_IDS.VIDEO_ENGAGEMENT,
+            label: 'Video Engagement',
+            icon: BarChart3,
+          },
+        ],
+      },
+      {
+        title: 'Communication',
+        collapsible: true,
+        items: [
+          {
+            id: SECTION_IDS.ANNOUNCEMENTS,
+            label: 'Announcements',
+            icon: Megaphone,
+          },
+          {
+            id: SECTION_IDS.NOTIFICATIONS,
+            label: 'Notifications',
+            icon: Bell,
+          },
+        ],
+      },
+      {
+        title: 'System / Settings',
+        collapsible: true,
+        items: [
+          {
+            id: SECTION_IDS.ADMIN_PROFILE,
+            label: 'Admin Profile',
+            icon: UserCheck,
+          },
+          {
+            id: SECTION_IDS.PLATFORM_SETTINGS,
+            label: 'Platform Settings',
+            icon: Settings,
+          },
+          {
+            id: SECTION_IDS.PERMISSIONS,
+            label: 'Permissions',
+            icon: ShieldCheck,
+          },
+        ],
+      },
+      {
+        title: 'Support',
+        collapsible: true,
+        items: [
+          {
+            id: SECTION_IDS.HELP_DESK,
+            label: 'Help Desk',
+            icon: Headset,
+          },
+          {
+            id: SECTION_IDS.FAQ_MANAGEMENT,
+            label: 'FAQ Management',
+            icon: HelpCircle,
+          },
+        ],
+      },
+    ],
+    [snapshot.workshops.length, snapshot.uploadJobs],
+  )
+
+  const allMenuItems = useMemo(
+    () => sidebarSections.flatMap((section) => section.items),
+    [sidebarSections],
+  )
+
+  const activeSectionMeta = useMemo(
+    () => allMenuItems.find((item) => item.id === activeSection) || allMenuItems[0],
+    [activeSection, allMenuItems],
+  )
+
+  const visibleSection = useMemo(() => {
+    if ([SECTION_IDS.ALL_WORKSHOPS, SECTION_IDS.CREATE_WORKSHOP].includes(activeSection)) return SECTION_IDS.WORKSHOPS
+    if ([SECTION_IDS.ALL_MODULES, SECTION_IDS.CREATE_MODULE].includes(activeSection)) return SECTION_IDS.MODULES
+    if ([SECTION_IDS.ALL_VIDEOS, SECTION_IDS.UPLOAD_VIDEO].includes(activeSection)) return SECTION_IDS.UPLOAD
+    if ([SECTION_IDS.UPLOAD_CENTER, SECTION_IDS.UPLOAD_PROGRESS, SECTION_IDS.MEDIA_LIBRARY].includes(activeSection)) return SECTION_IDS.UPLOAD
+    if ([SECTION_IDS.ALL_STUDENTS, SECTION_IDS.ENROLLED_STUDENTS, SECTION_IDS.GRANT_ACCESS, SECTION_IDS.REVOKE_ACCESS].includes(activeSection)) return SECTION_IDS.ACCESS
+    if ([SECTION_IDS.ANALYTICS_OVERVIEW, SECTION_IDS.WORKSHOP_PERFORMANCE, SECTION_IDS.VIDEO_ENGAGEMENT].includes(activeSection)) return SECTION_IDS.ANALYTICS
+    if ([SECTION_IDS.ANNOUNCEMENTS, SECTION_IDS.NOTIFICATIONS].includes(activeSection)) return 'communication'
+    if ([SECTION_IDS.ADMIN_PROFILE, SECTION_IDS.PLATFORM_SETTINGS, SECTION_IDS.PERMISSIONS].includes(activeSection)) return SECTION_IDS.SETTINGS
+    if ([SECTION_IDS.HELP_DESK, SECTION_IDS.FAQ_MANAGEMENT].includes(activeSection)) return 'support'
+    return SECTION_IDS.OVERVIEW
+  }, [activeSection])
+
+  const selectedModuleWorkshop = useMemo(
+    () => snapshot.workshops.find((workshop) => workshop.id === moduleWorkshopId) || null,
+    [snapshot.workshops, moduleWorkshopId],
+  )
+
+  const selectedModule = useMemo(
+    () => selectedModuleWorkshop?.modules.find((module) => module.id === selectedModuleId) || null,
+    [selectedModuleWorkshop, selectedModuleId],
+  )
+
+  const orderedModuleVideos = useMemo(
+    () => (selectedModule?.videos ? [...selectedModule.videos].sort((a, b) => a.order - b.order) : []),
+    [selectedModule],
+  )
+
+  const filteredModuleVideos = useMemo(() => {
+    const query = videoSearch.trim().toLowerCase()
+    if (!query) return orderedModuleVideos
+
+    return orderedModuleVideos.filter(
+      (video) => video.title.toLowerCase().includes(query) || video.description.toLowerCase().includes(query),
+    )
+  }, [orderedModuleVideos, videoSearch])
+
+  const filteredWorkshops = useMemo(() => {
+    const query = workshopSearch.trim().toLowerCase()
+
+    return snapshot.workshops.filter((workshop) => {
+      if (workshopStatusFilter !== 'all' && workshop.status !== workshopStatusFilter) return false
+      if (!query) return true
+
+      return workshop.title.toLowerCase().includes(query) || workshop.description.toLowerCase().includes(query)
+    })
+  }, [snapshot.workshops, workshopSearch, workshopStatusFilter])
+
+  const orderedUploadJobs = useMemo(
+    () =>
+      [...snapshot.uploadJobs].sort(
+        (a, b) =>
+          new Date(b.startedAt || b.completedAt || 0).getTime() - new Date(a.startedAt || a.completedAt || 0).getTime(),
+      ),
+    [snapshot.uploadJobs],
+  )
+
+  const accessWorkshop = useMemo(
+    () => snapshot.workshops.find((workshop) => workshop.id === accessWorkshopId) || null,
+    [snapshot.workshops, accessWorkshopId],
+  )
+
+  const accessRows = useMemo(
+    () => snapshot.accessEntries.filter((entry) => entry.workshopId === accessWorkshopId),
+    [snapshot.accessEntries, accessWorkshopId],
+  )
+
+  const sourceWorkshopLabel = useMemo(() => {
+    if (!accessWorkshop?.originalWorkshopId) return 'No source workshop linked'
+
+    const source = snapshot.liveWorkshops.find((workshop) => String(workshop.id) === String(accessWorkshop.originalWorkshopId))
+    return source ? source.title : `Source workshop #${accessWorkshop.originalWorkshopId}`
+  }, [accessWorkshop, snapshot.liveWorkshops])
+
+  const handleLogout = () => logoutAdmin(navigate)
+
+  const clearWorkshopForm = () => {
+    setWorkshopForm(INITIAL_WORKSHOP_FORM)
+    setEditingWorkshopId(null)
+    setWorkshopThumbPreview('')
+  }
+
+  const handleWorkshopThumbChange = (file) => {
+    setWorkshopForm((prev) => ({ ...prev, thumbnailFile: file || null }))
+
+    if (!file) {
+      setWorkshopThumbPreview('')
+      return
+    }
+
+    const preview = URL.createObjectURL(file)
+    setWorkshopThumbPreview(preview)
+  }
+
+  const handleWorkshopSubmit = async (event) => {
+    event.preventDefault()
+    if (busy) return
+
+    setBusy(true)
+    setError('')
+
+    try {
+      const payload = {
+        title: workshopForm.title,
+        description: workshopForm.description,
+        status: workshopForm.status,
+        originalWorkshopId: workshopForm.originalWorkshopId || null,
+        thumbnailName: workshopForm.thumbnailFile?.name || null,
+        thumbnailBlobUrl: workshopForm.thumbnailFile ? URL.createObjectURL(workshopForm.thumbnailFile) : undefined,
+      }
+
+      if (editingWorkshopId) {
+        await lmsAdminService.updateWorkshop(editingWorkshopId, payload)
+        setFlash('Workshop updated successfully.')
+      } else {
+        await lmsAdminService.createWorkshop(payload)
+        setFlash('Recorded workshop created successfully.')
+      }
+
+      clearWorkshopForm()
+      await loadSnapshot({ silent: true })
+    } catch (err) {
+      console.error(err)
+      setError(err?.message || 'Could not save workshop.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleWorkshopEdit = (workshop) => {
+    setEditingWorkshopId(workshop.id)
+    setWorkshopForm({
+      title: workshop.title,
+      description: workshop.description,
+      status: workshop.status,
+      originalWorkshopId: workshop.originalWorkshopId ? String(workshop.originalWorkshopId) : '',
+      thumbnailFile: null,
+    })
+    setWorkshopThumbPreview(workshop.thumbnailBlobUrl || '')
+    setActiveSection(SECTION_IDS.WORKSHOPS)
+  }
+
+  const handleWorkshopDelete = async (workshopId) => {
+    if (busy) return
+
+    setBusy(true)
+    setError('')
+
+    try {
+      await lmsAdminService.deleteWorkshop(workshopId)
+      if (editingWorkshopId === workshopId) clearWorkshopForm()
+      setFlash('Workshop deleted.')
+      await loadSnapshot({ silent: true })
+    } catch (err) {
+      console.error(err)
+      setError(err?.message || 'Could not delete workshop.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleAddModule = async (event) => {
+    event.preventDefault()
+    if (!moduleWorkshopId || !newModuleTitle.trim()) return
+
+    setBusy(true)
+    setError('')
+
+    try {
+      const created = await lmsAdminService.addModule(moduleWorkshopId, newModuleTitle)
+      setNewModuleTitle('')
+      setSelectedModuleId(created.id)
+      await loadSnapshot({ silent: true })
+      setFlash('Module added.')
+    } catch (err) {
+      console.error(err)
+      setError(err?.message || 'Could not add module.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleRenameModule = async (module) => {
+    const nextTitle = window.prompt('Rename module', module.title)
+    if (!nextTitle || nextTitle.trim() === module.title) return
+
+    setBusy(true)
+
+    try {
+      await lmsAdminService.updateModule(moduleWorkshopId, module.id, { title: nextTitle })
+      await loadSnapshot({ silent: true })
+      setFlash('Module renamed.')
+    } catch (err) {
+      console.error(err)
+      setError(err?.message || 'Could not rename module.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleDeleteModule = async (moduleId) => {
+    setBusy(true)
+
+    try {
+      await lmsAdminService.deleteModule(moduleWorkshopId, moduleId)
+      await loadSnapshot({ silent: true })
+      setFlash('Module removed.')
+    } catch (err) {
+      console.error(err)
+      setError(err?.message || 'Could not remove module.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleDeleteVideo = async (videoId) => {
+    if (!selectedModuleId) return
+
+    setBusy(true)
+
+    try {
+      await lmsAdminService.deleteVideo(moduleWorkshopId, selectedModuleId, videoId)
+      await loadSnapshot({ silent: true })
+      setFlash('Video deleted from module.')
+    } catch (err) {
+      console.error(err)
+      setError(err?.message || 'Could not remove video.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleModuleDrop = async (targetIndex) => {
+    if (dragModuleIndex === null || dragModuleIndex === targetIndex || !moduleWorkshopId) {
+      setDragModuleIndex(null)
+      return
+    }
+
+    setBusy(true)
+
+    try {
+      await lmsAdminService.reorderModules(moduleWorkshopId, dragModuleIndex, targetIndex)
+      await loadSnapshot({ silent: true })
+    } catch (err) {
+      console.error(err)
+      setError(err?.message || 'Could not reorder modules.')
+    } finally {
+      setDragModuleIndex(null)
+      setBusy(false)
+    }
+  }
+
+  const handleVideoDrop = async (targetIndex) => {
+    if (!selectedModuleId || dragVideoIndex === null || dragVideoIndex === targetIndex) {
+      setDragVideoIndex(null)
+      return
+    }
+
+    const sourceId = filteredModuleVideos[dragVideoIndex]?.id
+    const targetId = filteredModuleVideos[targetIndex]?.id
+
+    const sourceIndex = orderedModuleVideos.findIndex((video) => video.id === sourceId)
+    const destinationIndex = orderedModuleVideos.findIndex((video) => video.id === targetId)
+
+    if (sourceIndex < 0 || destinationIndex < 0) {
+      setDragVideoIndex(null)
+      return
+    }
+
+    setBusy(true)
+
+    try {
+      await lmsAdminService.reorderVideos(moduleWorkshopId, selectedModuleId, sourceIndex, destinationIndex)
+      await loadSnapshot({ silent: true })
+    } catch (err) {
+      console.error(err)
+      setError(err?.message || 'Could not reorder videos.')
+    } finally {
+      setDragVideoIndex(null)
+      setBusy(false)
+    }
+  }
+
+  const refreshSourceParticipants = useCallback(async () => {
+    if (!accessWorkshop?.originalWorkshopId) {
+      setSourceParticipants([])
+      return
+    }
+
+    setParticipantsLoading(true)
+
+    try {
+      const result = await lmsAdminService.getSourceParticipants(accessWorkshop.originalWorkshopId)
+
+      if (!result.ok) {
+        setSourceParticipants([])
+        setError(result.message || 'Could not fetch participants from source workshop.')
+        return
+      }
+
+      setSourceParticipants(result.participants)
+    } catch (err) {
+      console.error(err)
+      setError(err?.message || 'Could not fetch source participants.')
+    } finally {
+      setParticipantsLoading(false)
+    }
+  }, [accessWorkshop?.originalWorkshopId])
+
+  useEffect(() => {
+    void refreshSourceParticipants()
+  }, [refreshSourceParticipants])
+
+  const handleSyncAccess = async () => {
+    if (!accessWorkshopId) return
+
+    setBusy(true)
+    setError('')
+
+    try {
+      const result = await lmsAdminService.syncAccessFromSource(accessWorkshopId)
+      await loadSnapshot({ silent: true })
+      setSourceParticipants(result.participants)
+      setFlash(`Synced ${result.syncedCount} participants into LMS access.`)
+    } catch (err) {
+      console.error(err)
+      setError(err?.message || 'Could not sync enrollments.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleManualGrant = async (event) => {
+    event.preventDefault()
+    if (!accessWorkshopId) return
+
+    setBusy(true)
+    setError('')
+
+    try {
+      await lmsAdminService.grantAccess({
+        workshopId: accessWorkshopId,
+        sourceWorkshopId: accessWorkshop?.originalWorkshopId || null,
+        fullName: manualAccessForm.fullName,
+        email: manualAccessForm.email,
+        userId: manualAccessForm.userId,
+        source: 'manual',
+      })
+
+      setManualAccessForm({ fullName: '', email: '', userId: '' })
+      await loadSnapshot({ silent: true })
+      setFlash('Access granted manually.')
+    } catch (err) {
+      console.error(err)
+      setError(err?.message || 'Could not grant access.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleToggleAccess = async (entry) => {
+    setBusy(true)
+
+    try {
+      const nextStatus = entry.status === 'granted' ? 'revoked' : 'granted'
+      await lmsAdminService.setAccessStatus(entry.id, nextStatus)
+      await loadSnapshot({ silent: true })
+      setFlash(nextStatus === 'granted' ? 'Access restored.' : 'Access revoked.')
+    } catch (err) {
+      console.error(err)
+      setError(err?.message || 'Could not update access status.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleUploadSubmit = async (event) => {
+    event.preventDefault()
+    if (!uploadForm.workshopId || !uploadForm.moduleId || !uploadForm.videoFiles.length) {
+      setError('Choose workshop, module, and at least one video file.')
+      return
+    }
+
+    setBusy(true)
+    setError('')
+
+    try {
+      const files = uploadForm.videoFiles
+
+      for (let index = 0; index < files.length; index += 1) {
+        const file = files[index]
+        const titleBase = uploadForm.title?.trim() || stripFileExtension(file.name)
+        const resolvedTitle = files.length > 1 ? `${titleBase} ${index + 1}` : titleBase
+
+        const uploadJob = await lmsAdminService.createUploadJob({
+          workshopId: uploadForm.workshopId,
+          moduleId: uploadForm.moduleId,
+          fileName: file.name,
+          fileSize: file.size,
+          status: 'queued',
+          progress: 0,
+          type: 'video',
+        })
+
+        for (const progress of [14, 29, 47, 63, 78, 92]) {
+          await sleep(130)
+          await lmsAdminService.updateUploadJob(uploadJob.id, {
+            status: 'uploading',
+            progress,
+          })
+          await loadSnapshot({ silent: true })
+        }
+
+        const videoBlobUrl = URL.createObjectURL(file)
+        const thumbBlobUrl = uploadForm.thumbnailFile ? URL.createObjectURL(uploadForm.thumbnailFile) : null
+
+        const created = await lmsAdminService.addVideo(uploadForm.workshopId, uploadForm.moduleId, {
+          title: resolvedTitle,
+          description: uploadForm.description,
+          duration: uploadForm.duration,
+          order: uploadForm.order || undefined,
+          fileName: file.name,
+          fileSize: file.size,
+          videoBlobUrl,
+          thumbnailBlobUrl: thumbBlobUrl,
+          thumbnailName: uploadForm.thumbnailFile?.name || null,
+        })
+
+        await lmsAdminService.updateUploadJob(uploadJob.id, {
+          status: 'completed',
+          progress: 100,
+          videoId: created.id,
+          completedAt: new Date().toISOString(),
+          previewBlobUrl: created.videoBlobUrl,
+        })
+
+        await loadSnapshot({ silent: true })
+      }
+
+      setUploadForm((prev) => ({
+        ...INITIAL_UPLOAD_FORM,
+        workshopId: prev.workshopId,
+        moduleId: prev.moduleId,
+      }))
+
+      setFlash(`${uploadForm.videoFiles.length} upload(s) completed successfully.`)
+    } catch (err) {
+      console.error(err)
+      setError(err?.message || 'Upload failed. Please try again.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleRemoveUploadJob = async (jobId) => {
+    await lmsAdminService.removeUploadJob(jobId)
+    await loadSnapshot({ silent: true })
+    setFlash('Upload record removed.')
+  }
+
+  const handleSaveSettings = async (section) => {
+    setBusy(true)
+    setError('')
+
+    try {
+      await lmsAdminService.updateSettings(section, settingsDraft[section])
+      await loadSnapshot({ silent: true })
+      setFlash(`${section} settings updated.`)
+    } catch (err) {
+      console.error(err)
+      setError(err?.message || 'Could not update settings.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const totalVideosByWorkshop = (workshop) =>
+    workshop.modules.reduce((sum, module) => sum + module.videos.length, 0)
+
+  const renderOverview = () => (
+    <section className="space-y-5">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <SuperAdminMetricCard
+          label="Total Workshops"
+          value={snapshot.metrics.totalWorkshops}
+          helper="Recorded workshops in LMS"
+        />
+        <SuperAdminMetricCard
+          label="Total Videos"
+          value={snapshot.metrics.totalVideos}
+          helper="Across all modules"
+        />
+        <SuperAdminMetricCard
+          label="Total Students"
+          value={snapshot.metrics.totalStudents}
+          helper="With granted access"
+        />
+        <SuperAdminMetricCard
+          label="Recent Uploads"
+          value={snapshot.metrics.recentUploads}
+          helper="Completed jobs"
+        />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Recent Uploads</h2>
+            <button
+              type="button"
+              onClick={() => setActiveSection(SECTION_IDS.UPLOAD)}
+              className="text-xs text-cyan-300 transition hover:text-cyan-200"
+            >
+              Open Upload Center
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            {orderedUploadJobs.slice(0, 6).map((job) => (
+              <div key={job.id} className="flex items-center justify-between rounded-md border border-[#1F1F23] px-3 py-2 text-sm">
+                <div className="truncate pr-3">
+                  <div className="truncate text-slate-100">{job.fileName}</div>
+                  <div className="text-xs text-slate-400">{formatFileSize(job.fileSize)}</div>
+                </div>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs ${
+                    job.status === 'completed'
+                      ? 'bg-emerald-500/15 text-emerald-300'
+                      : job.status === 'failed'
+                      ? 'bg-rose-500/15 text-rose-300'
+                      : 'bg-amber-500/15 text-amber-300'
+                  }`}
+                >
+                  {job.status}
+                </span>
+              </div>
+            ))}
+
+            {!orderedUploadJobs.length && (
+              <div className="rounded-md border border-dashed border-[#2B2B30] px-3 py-6 text-center text-sm text-slate-400">
+                No uploads yet. Start from Upload Center.
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Activity Logs</h2>
+            <Clock3 className="h-4 w-4 text-slate-500" />
+          </div>
+
+          <div className="space-y-3">
+            {snapshot.activityLogs.slice(0, 8).map((log) => (
+              <div key={log.id} className="rounded-md border border-[#1F1F23] bg-[#0F0F12] px-3 py-2">
+                <div className="text-sm text-white">{log.action}</div>
+                <div className="text-xs text-slate-400">
+                  {log.actor} • {log.target} • {formatDateTime(log.at)}
+                </div>
+              </div>
+            ))}
+
+            {!snapshot.activityLogs.length && (
+              <div className="rounded-md border border-dashed border-[#2B2B30] px-3 py-6 text-center text-sm text-slate-400">
+                Activity logs will appear here after operations.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+
+  const renderWorkshops = () => (
+    <section className="grid gap-4 xl:grid-cols-[2fr_1fr]">
+      <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Recorded Workshops</h2>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 rounded-md border border-[#2B2B30] px-3 py-2 text-sm text-slate-300">
+              <Search className="h-4 w-4 text-slate-500" />
+              <input
+                type="text"
+                value={workshopSearch}
+                onChange={(event) => setWorkshopSearch(event.target.value)}
+                placeholder="Search workshops"
+                className="w-44 bg-transparent outline-none"
+              />
+            </label>
+
+            <select
+              value={workshopStatusFilter}
+              onChange={(event) => setWorkshopStatusFilter(event.target.value)}
+              className="rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-slate-200 outline-none"
+            >
+              <option value="all">All statuses</option>
+              <option value="draft">Draft</option>
+              <option value="published">Published</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {filteredWorkshops.map((workshop) => (
+            <div key={workshop.id} className="rounded-md border border-[#1F1F23] bg-[#0F0F12] p-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold text-white">{workshop.title}</div>
+                  <p className="mt-1 line-clamp-2 text-xs text-slate-400">{workshop.description || 'No description yet.'}</p>
+                </div>
+
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs ${
+                    workshop.status === 'published'
+                      ? 'bg-emerald-500/15 text-emerald-300'
+                      : 'bg-amber-500/15 text-amber-300'
+                  }`}
+                >
+                  {workshop.status}
+                </span>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+                <div>
+                  Modules: {workshop.modules.length} • Videos: {totalVideosByWorkshop(workshop)}
+                </div>
+                <div>
+                  Source workshop: {workshop.originalWorkshopId || 'Not linked'}
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleWorkshopEdit(workshop)}
+                  className="inline-flex items-center gap-1 rounded-md border border-[#2B2B30] px-2 py-1 text-xs text-slate-200 transition hover:bg-[#1A1A1F]"
+                >
+                  <Pencil className="h-3.5 w-3.5" /> Edit
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleWorkshopDelete(workshop.id)}
+                  className="inline-flex items-center gap-1 rounded-md border border-rose-700/60 px-2 py-1 text-xs text-rose-200 transition hover:bg-rose-500/10"
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Delete
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {!filteredWorkshops.length && (
+            <div className="rounded-md border border-dashed border-[#2B2B30] px-3 py-8 text-center text-sm text-slate-400">
+              No workshops match your filter.
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">
+            {editingWorkshopId ? 'Edit Workshop' : 'Create Workshop'}
+          </h2>
+
+          {editingWorkshopId && (
+            <button
+              type="button"
+              onClick={clearWorkshopForm}
+              className="text-xs text-slate-400 transition hover:text-slate-200"
+            >
+              Cancel edit
+            </button>
+          )}
+        </div>
+
+        <form className="space-y-3" onSubmit={handleWorkshopSubmit}>
+          <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
+            Title
+            <input
+              type="text"
+              value={workshopForm.title}
+              onChange={(event) => setWorkshopForm((prev) => ({ ...prev, title: event.target.value }))}
+              placeholder="Recorded workshop title"
+              className="mt-1 w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
+              required
+            />
+          </label>
+
+          <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
+            Description
+            <textarea
+              value={workshopForm.description}
+              onChange={(event) => setWorkshopForm((prev) => ({ ...prev, description: event.target.value }))}
+              rows={4}
+              placeholder="Describe what students will get from this recording"
+              className="mt-1 w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
+            />
+          </label>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
+              Status
+              <select
+                value={workshopForm.status}
+                onChange={(event) => setWorkshopForm((prev) => ({ ...prev, status: event.target.value }))}
+                className="mt-1 w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
+              >
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+              </select>
+            </label>
+
+            <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
+              Source Workshop
+              <select
+                value={workshopForm.originalWorkshopId}
+                onChange={(event) => setWorkshopForm((prev) => ({ ...prev, originalWorkshopId: event.target.value }))}
+                className="mt-1 w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
+              >
+                <option value="">Not linked</option>
+                {snapshot.liveWorkshops.map((workshop) => (
+                  <option key={workshop.id} value={String(workshop.id)}>
+                    {workshop.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
+            Thumbnail
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(event) => handleWorkshopThumbChange(event.target.files?.[0])}
+              className="mt-1 w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-slate-200"
+            />
+          </label>
+
+          {workshopThumbPreview && (
+            <img
+              src={workshopThumbPreview}
+              alt="Workshop thumbnail preview"
+              className="h-28 w-full rounded-md border border-[#1F1F23] object-cover"
+            />
+          )}
+
+          {!editingWorkshopId && draftSavedAt && (
+            <div className="text-xs text-slate-500">Draft autosaved at {formatDateTime(draftSavedAt)}</div>
+          )}
+
+          <button
+            type="submit"
+            disabled={busy}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-cyan-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-500 disabled:opacity-70"
+          >
+            {editingWorkshopId ? 'Update workshop' : 'Create workshop'}
+          </button>
+        </form>
+      </div>
+    </section>
+  )
+
+  const renderModules = () => (
+    <section className="grid gap-4 xl:grid-cols-[1.2fr_2fr]">
+      <div className="space-y-4 rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Module Builder</h2>
+
+          <select
+            value={moduleWorkshopId}
+            onChange={(event) => setModuleWorkshopId(event.target.value)}
+            className="rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
+          >
+            {snapshot.workshops.map((workshop) => (
+              <option key={workshop.id} value={workshop.id}>
+                {workshop.title}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <form className="flex flex-wrap gap-2" onSubmit={handleAddModule}>
+          <input
+            type="text"
+            value={newModuleTitle}
+            onChange={(event) => setNewModuleTitle(event.target.value)}
+            placeholder="New module title"
+            className="min-w-0 flex-1 rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
+          />
+
+          <button
+            type="submit"
+            className="inline-flex items-center gap-1 rounded-md border border-[#2B2B30] px-3 py-2 text-sm text-slate-100 transition hover:bg-[#1A1A1F]"
+          >
+            <Plus className="h-4 w-4" /> Add
+          </button>
+        </form>
+
+        <div className="space-y-2">
+          {selectedModuleWorkshop?.modules
+            ?.slice()
+            .sort((a, b) => a.order - b.order)
+            .map((module, index) => (
+              <div
+                key={module.id}
+                draggable
+                onDragStart={() => setDragModuleIndex(index)}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={() => handleModuleDrop(index)}
+                onDragEnd={() => setDragModuleIndex(null)}
+                className={`rounded-md border px-3 py-2 transition ${
+                  selectedModuleId === module.id
+                    ? 'border-cyan-700 bg-cyan-700/10'
+                    : 'border-[#1F1F23] bg-[#0F0F12] hover:border-[#2B2B30]'
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => setSelectedModuleId(module.id)}
+                  className="w-full text-left"
+                >
+                  <div className="truncate text-sm font-medium text-white">{module.title}</div>
+                  <div className="text-xs text-slate-400">{module.videos.length} videos</div>
+                </button>
+
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleRenameModule(module)}
+                    className="inline-flex items-center gap-1 rounded-md border border-[#2B2B30] px-2 py-1 text-xs text-slate-200 transition hover:bg-[#1A1A1F]"
+                  >
+                    <Pencil className="h-3.5 w-3.5" /> Rename
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteModule(module.id)}
+                    className="inline-flex items-center gap-1 rounded-md border border-rose-700/60 px-2 py-1 text-xs text-rose-200 transition hover:bg-rose-500/10"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+
+          {!selectedModuleWorkshop?.modules.length && (
+            <div className="rounded-md border border-dashed border-[#2B2B30] px-3 py-6 text-center text-sm text-slate-400">
+              No modules yet for this workshop.
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-4 rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">
+            {selectedModule ? `${selectedModule.title} - Videos` : 'Videos'}
+          </h2>
+
+          <div className="flex items-center gap-2 rounded-md border border-[#2B2B30] px-3 py-2 text-sm text-slate-300">
+            <Search className="h-4 w-4 text-slate-500" />
+            <input
+              type="text"
+              value={videoSearch}
+              onChange={(event) => setVideoSearch(event.target.value)}
+              placeholder="Search videos"
+              className="w-40 bg-transparent outline-none"
+            />
+          </div>
+        </div>
+
+        {selectedModule ? (
+          <>
+            <div className="space-y-2">
+              {filteredModuleVideos.map((video, index) => (
+                <div
+                  key={video.id}
+                  draggable
+                  onDragStart={() => setDragVideoIndex(index)}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={() => handleVideoDrop(index)}
+                  onDragEnd={() => setDragVideoIndex(null)}
+                  className="rounded-md border border-[#1F1F23] bg-[#0F0F12] p-3"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <div className="text-sm font-medium text-white">{video.title}</div>
+                      <div className="text-xs text-slate-400">
+                        Duration: {video.duration} • {formatFileSize(video.fileSize)} • Order {video.order}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteVideo(video.id)}
+                      className="inline-flex items-center gap-1 rounded-md border border-rose-700/60 px-2 py-1 text-xs text-rose-200 transition hover:bg-rose-500/10"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete
+                    </button>
+                  </div>
+
+                  {video.videoBlobUrl && (
+                    <div className="mt-3 overflow-hidden rounded-md border border-[#1F1F23]">
+                      <video controls className="h-40 w-full bg-black" src={video.videoBlobUrl} />
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {!filteredModuleVideos.length && (
+                <div className="rounded-md border border-dashed border-[#2B2B30] px-3 py-8 text-center text-sm text-slate-400">
+                  No videos found in this module.
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setUploadForm((prev) => ({ ...prev, workshopId: moduleWorkshopId, moduleId: selectedModuleId }))
+                setActiveSection(SECTION_IDS.UPLOAD)
+              }}
+              className="inline-flex items-center gap-2 rounded-md border border-cyan-700 px-3 py-2 text-sm text-cyan-200 transition hover:bg-cyan-500/10"
+            >
+              <UploadCloud className="h-4 w-4" />
+              Upload new videos to this module
+            </button>
+          </>
+        ) : (
+          <div className="rounded-md border border-dashed border-[#2B2B30] px-3 py-10 text-center text-sm text-slate-400">
+            Select a module to manage videos.
+          </div>
+        )}
+      </div>
+    </section>
+  )
+
+  const renderAccessControl = () => (
+    <section className="space-y-4">
+      <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Enrollment-Based Access Control</h2>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={accessWorkshopId}
+              onChange={(event) => setAccessWorkshopId(event.target.value)}
+              className="rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
+            >
+              {snapshot.workshops.map((workshop) => (
+                <option key={workshop.id} value={workshop.id}>
+                  {workshop.title}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              onClick={handleSyncAccess}
+              disabled={busy || !accessWorkshop?.originalWorkshopId}
+              className="inline-flex items-center gap-2 rounded-md border border-[#2B2B30] px-3 py-2 text-sm text-slate-100 transition hover:bg-[#1A1A1F] disabled:opacity-50"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Sync from source workshop
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-4 rounded-md border border-[#1F1F23] bg-[#0F0F12] px-3 py-2 text-xs text-slate-400">
+          Source mapping: {sourceWorkshopLabel}
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-[2fr_1fr]">
+          <div className="space-y-2">
+            <h3 className="text-xs uppercase tracking-[0.14em] text-slate-400">Current Access List</h3>
+
+            {accessRows.map((entry) => (
+              <div key={entry.id} className="rounded-md border border-[#1F1F23] bg-[#0F0F12] p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-medium text-white">{entry.fullName || 'Unknown User'}</div>
+                    <div className="text-xs text-slate-400">{entry.email}</div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs ${
+                        entry.status === 'granted'
+                          ? 'bg-emerald-500/15 text-emerald-300'
+                          : 'bg-rose-500/15 text-rose-300'
+                      }`}
+                    >
+                      {entry.status}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => handleToggleAccess(entry)}
+                      className="rounded-md border border-[#2B2B30] px-2 py-1 text-xs text-slate-100 transition hover:bg-[#1A1A1F]"
+                    >
+                      {entry.status === 'granted' ? 'Revoke' : 'Grant'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {!accessRows.length && (
+              <div className="rounded-md border border-dashed border-[#2B2B30] px-3 py-8 text-center text-sm text-slate-400">
+                No access records yet for this workshop.
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <div className="rounded-md border border-[#1F1F23] bg-[#0F0F12] p-3">
+              <h3 className="mb-2 text-xs uppercase tracking-[0.14em] text-slate-400">Manual Grant</h3>
+              <form className="space-y-2" onSubmit={handleManualGrant}>
+                <input
+                  type="text"
+                  value={manualAccessForm.fullName}
+                  onChange={(event) => setManualAccessForm((prev) => ({ ...prev, fullName: event.target.value }))}
+                  placeholder="Student full name"
+                  className="w-full rounded-md border border-[#2B2B30] bg-[#111115] px-3 py-2 text-sm text-white outline-none"
+                  required
+                />
+
+                <input
+                  type="email"
+                  value={manualAccessForm.email}
+                  onChange={(event) => setManualAccessForm((prev) => ({ ...prev, email: event.target.value }))}
+                  placeholder="student@email.com"
+                  className="w-full rounded-md border border-[#2B2B30] bg-[#111115] px-3 py-2 text-sm text-white outline-none"
+                  required
+                />
+
+                <input
+                  type="text"
+                  value={manualAccessForm.userId}
+                  onChange={(event) => setManualAccessForm((prev) => ({ ...prev, userId: event.target.value }))}
+                  placeholder="Optional userId"
+                  className="w-full rounded-md border border-[#2B2B30] bg-[#111115] px-3 py-2 text-sm text-white outline-none"
+                />
+
+                <button
+                  type="submit"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-cyan-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-cyan-500"
+                >
+                  <Plus className="h-4 w-4" /> Grant Access
+                </button>
+              </form>
+            </div>
+
+            <div className="rounded-md border border-[#1F1F23] bg-[#0F0F12] p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-xs uppercase tracking-[0.14em] text-slate-400">Source Participants</h3>
+                <button
+                  type="button"
+                  onClick={() => refreshSourceParticipants()}
+                  className="text-xs text-cyan-300 transition hover:text-cyan-200"
+                >
+                  Refresh
+                </button>
+              </div>
+
+              <div className="max-h-72 space-y-2 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                {participantsLoading && <div className="text-xs text-slate-400">Loading participants...</div>}
+
+                {!participantsLoading &&
+                  sourceParticipants.slice(0, 12).map((participant) => (
+                    <div key={participant.id} className="rounded-md border border-[#1F1F23] px-2 py-1.5 text-xs">
+                      <div className="text-slate-200">{participant.fullName}</div>
+                      <div className="text-slate-500">{participant.email}</div>
+                    </div>
+                  ))}
+
+                {!participantsLoading && !sourceParticipants.length && (
+                  <div className="text-xs text-slate-500">No source participants found.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+
+  const renderUploadCenter = () => (
+    <section className="space-y-4">
+      <div className="grid gap-4 xl:grid-cols-[1.2fr_2fr]">
+        <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Upload Video Files</h2>
+
+          <form className="space-y-3" onSubmit={handleUploadSubmit}>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-xs uppercase tracking-[0.14em] text-slate-400">
+                Workshop
+                <select
+                  value={uploadForm.workshopId}
+                  onChange={(event) => {
+                    const workshopId = event.target.value
+                    const workshop = snapshot.workshops.find((item) => item.id === workshopId)
+                    setUploadForm((prev) => ({
+                      ...prev,
+                      workshopId,
+                      moduleId: workshop?.modules?.[0]?.id || '',
+                    }))
+                  }}
+                  className="mt-1 w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
+                >
+                  {snapshot.workshops.map((workshop) => (
+                    <option key={workshop.id} value={workshop.id}>
+                      {workshop.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="text-xs uppercase tracking-[0.14em] text-slate-400">
+                Module
+                <select
+                  value={uploadForm.moduleId}
+                  onChange={(event) => setUploadForm((prev) => ({ ...prev, moduleId: event.target.value }))}
+                  className="mt-1 w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
+                >
+                  {(snapshot.workshops.find((workshop) => workshop.id === uploadForm.workshopId)?.modules || []).map(
+                    (module) => (
+                      <option key={module.id} value={module.id}>
+                        {module.title}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </label>
+            </div>
+
+            <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
+              Video Title
+              <input
+                type="text"
+                value={uploadForm.title}
+                onChange={(event) => setUploadForm((prev) => ({ ...prev, title: event.target.value }))}
+                placeholder="Lecture title"
+                className="mt-1 w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
+              />
+            </label>
+
+            <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
+              Description
+              <textarea
+                value={uploadForm.description}
+                onChange={(event) => setUploadForm((prev) => ({ ...prev, description: event.target.value }))}
+                rows={3}
+                placeholder="Video summary"
+                className="mt-1 w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
+              />
+            </label>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-xs uppercase tracking-[0.14em] text-slate-400">
+                Duration
+                <input
+                  type="text"
+                  value={uploadForm.duration}
+                  onChange={(event) => setUploadForm((prev) => ({ ...prev, duration: event.target.value }))}
+                  placeholder="e.g. 18:40"
+                  className="mt-1 w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
+                />
+              </label>
+
+              <label className="text-xs uppercase tracking-[0.14em] text-slate-400">
+                Sequence Order
+                <input
+                  type="number"
+                  min="1"
+                  value={uploadForm.order}
+                  onChange={(event) => setUploadForm((prev) => ({ ...prev, order: event.target.value }))}
+                  placeholder="Auto"
+                  className="mt-1 w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
+                />
+              </label>
+            </div>
+
+            <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
+              Video File (bulk upload supported)
+              <input
+                type="file"
+                accept="video/*"
+                multiple
+                onChange={(event) => setUploadForm((prev) => ({ ...prev, videoFiles: Array.from(event.target.files || []) }))}
+                className="mt-1 w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-slate-200"
+              />
+            </label>
+
+            <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
+              Thumbnail File
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(event) => setUploadForm((prev) => ({ ...prev, thumbnailFile: event.target.files?.[0] || null }))}
+                className="mt-1 w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-slate-200"
+              />
+            </label>
+
+            {uploadPreviewUrl && (
+              <div className="space-y-2 rounded-md border border-[#1F1F23] bg-[#0F0F12] p-3">
+                <div className="text-xs text-slate-400">Preview before publish</div>
+                <video src={uploadPreviewUrl} controls className="h-40 w-full rounded-md bg-black" />
+              </div>
+            )}
+
+            {uploadThumbPreviewUrl && (
+              <img src={uploadThumbPreviewUrl} alt="Thumbnail preview" className="h-24 w-full rounded-md border border-[#1F1F23] object-cover" />
+            )}
+
+            {uploadForm.videoFiles.length > 1 && (
+              <div className="rounded-md border border-[#1F1F23] bg-[#0F0F12] px-3 py-2 text-xs text-slate-300">
+                {uploadForm.videoFiles.length} files selected. They will be uploaded sequentially.
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={busy}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-cyan-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-500 disabled:opacity-70"
+            >
+              <UploadCloud className="h-4 w-4" /> Start Upload
+            </button>
+          </form>
+        </div>
+
+        <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Upload Jobs</h2>
+
+          <div className="space-y-2">
+            {orderedUploadJobs.map((job) => {
+              const linkedVideo = snapshot.workshops
+                .flatMap((workshop) => workshop.modules)
+                .flatMap((module) => module.videos)
+                .find((video) => video.id === job.videoId)
+
+              const previewSource = job.previewBlobUrl || linkedVideo?.videoBlobUrl || null
+
+              return (
+                <div key={job.id} className="rounded-md border border-[#1F1F23] bg-[#0F0F12] p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium text-white">{job.fileName}</div>
+                      <div className="text-xs text-slate-400">
+                        {formatFileSize(job.fileSize)} • {formatDateTime(job.startedAt)}
+                      </div>
+                    </div>
+
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs ${
+                        job.status === 'completed'
+                          ? 'bg-emerald-500/15 text-emerald-300'
+                          : job.status === 'failed'
+                          ? 'bg-rose-500/15 text-rose-300'
+                          : 'bg-amber-500/15 text-amber-300'
+                      }`}
+                    >
+                      {job.status}
+                    </span>
+                  </div>
+
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[#1F1F23]">
+                    <div
+                      className={`h-full transition-all ${
+                        job.status === 'completed'
+                          ? 'bg-emerald-500'
+                          : job.status === 'failed'
+                          ? 'bg-rose-500'
+                          : 'bg-cyan-500'
+                      }`}
+                      style={{ width: `${Math.min(100, Math.max(0, Number(job.progress || 0)))}%` }}
+                    />
+                  </div>
+
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div className="text-slate-400">Progress: {Math.min(100, Math.max(0, Number(job.progress || 0)))}%</div>
+
+                    <div className="flex gap-2">
+                      {previewSource && (
+                        <button
+                          type="button"
+                          onClick={() => setPreviewJobId((prev) => (prev === job.id ? '' : job.id))}
+                          className="rounded-md border border-[#2B2B30] px-2 py-1 text-slate-100 transition hover:bg-[#1A1A1F]"
+                        >
+                          {previewJobId === job.id ? 'Hide preview' : 'Preview'}
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveUploadJob(job.id)}
+                        className="rounded-md border border-rose-700/60 px-2 py-1 text-rose-200 transition hover:bg-rose-500/10"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+
+                  {previewJobId === job.id && previewSource && (
+                    <div className="mt-2 overflow-hidden rounded-md border border-[#1F1F23]">
+                      <video src={previewSource} controls className="h-40 w-full bg-black" />
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+
+            {!orderedUploadJobs.length && (
+              <div className="rounded-md border border-dashed border-[#2B2B30] px-3 py-8 text-center text-sm text-slate-400">
+                Upload queue is empty.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+
+  const renderAnalytics = () => {
+    const workshopViews = snapshot.analytics.workshopViews || []
+    const maxViews = Math.max(1, ...workshopViews.map((entry) => entry.views))
+
+    return (
+      <section className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <SuperAdminMetricCard
+            label="Total Views"
+            value={snapshot.analytics.engagement.totalViews}
+            helper="From top videos"
+          />
+          <SuperAdminMetricCard
+            label="Completions"
+            value={snapshot.analytics.engagement.totalCompletions}
+            helper="Finished watch counts"
+          />
+          <SuperAdminMetricCard
+            label="Completion Ratio"
+            value={`${snapshot.analytics.engagement.completionRatio}%`}
+            helper="Student engagement"
+          />
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-2">
+          <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Views per Workshop</h2>
+
+            <div className="space-y-3">
+              {workshopViews.map((entry) => (
+                <div key={entry.workshopId}>
+                  <div className="mb-1 flex items-center justify-between text-xs text-slate-300">
+                    <span className="truncate pr-3">{entry.title}</span>
+                    <span>{entry.views}</span>
+                  </div>
+
+                  <div className="h-2 overflow-hidden rounded-full bg-[#1F1F23]">
+                    <div
+                      className="h-full rounded-full bg-cyan-500"
+                      style={{ width: `${Math.max(6, (entry.views / maxViews) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+
+              {!workshopViews.length && <div className="text-sm text-slate-400">No analytics data yet.</div>}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Most Watched Videos</h2>
+
+            <div className="space-y-2">
+              {(snapshot.analytics.topVideos || []).map((video, index) => (
+                <div key={video.id} className="rounded-md border border-[#1F1F23] bg-[#0F0F12] px-3 py-2">
+                  <div className="flex items-center justify-between">
+                    <div className="truncate pr-3 text-sm text-white">
+                      {index + 1}. {video.title}
+                    </div>
+                    <div className="text-xs text-slate-400">{video.views} views</div>
+                  </div>
+                  <div className="text-xs text-slate-500">{video.workshopTitle}</div>
+                </div>
+              ))}
+
+              {!snapshot.analytics.topVideos?.length && <div className="text-sm text-slate-400">No video insights available.</div>}
+            </div>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  const renderCommunication = () => (
+    <section className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Announcements</h2>
+          <p className="text-sm text-slate-400">Create and publish announcements for students, workshop attendees, and staff.</p>
+          <button className="mt-4 inline-flex items-center gap-2 rounded-md border border-[#2B2B30] px-3 py-2 text-sm text-slate-100 transition hover:bg-[#1A1A1F]">
+            <Megaphone className="h-4 w-4" /> Create announcement
+          </button>
+        </div>
+
+        <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Notifications</h2>
+          <p className="text-sm text-slate-400">Manage notification channels and future alert preferences.</p>
+          <button className="mt-4 inline-flex items-center gap-2 rounded-md border border-[#2B2B30] px-3 py-2 text-sm text-slate-100 transition hover:bg-[#1A1A1F]">
+            <Bell className="h-4 w-4" /> Review notifications
+          </button>
+        </div>
+      </div>
+    </section>
+  )
+
+  const renderSupport = () => (
+    <section className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Help Desk</h2>
+          <p className="text-sm text-slate-400">Review incoming help requests and prioritize student support tickets.</p>
+          <button className="mt-4 inline-flex items-center gap-2 rounded-md border border-[#2B2B30] px-3 py-2 text-sm text-slate-100 transition hover:bg-[#1A1A1F]">
+            <Headset className="h-4 w-4" /> Open help desk
+          </button>
+        </div>
+
+        <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">FAQ Management</h2>
+          <p className="text-sm text-slate-400">Maintain student-facing FAQs for the LMS and workshop platform.</p>
+          <button className="mt-4 inline-flex items-center gap-2 rounded-md border border-[#2B2B30] px-3 py-2 text-sm text-slate-100 transition hover:bg-[#1A1A1F]">
+            <HelpCircle className="h-4 w-4" /> Edit FAQs
+          </button>
+        </div>
+      </div>
+    </section>
+  )
+
+  const renderSettings = () => (
+    <section className="grid gap-4 xl:grid-cols-3">
+      <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Admin Profile</h2>
+
+        <div className="space-y-2">
+          <input
+            type="text"
+            value={settingsDraft.profile.displayName}
+            onChange={(event) =>
+              setSettingsDraft((prev) => ({
+                ...prev,
+                profile: { ...prev.profile, displayName: event.target.value },
+              }))
+            }
+            placeholder="Display name"
+            className="w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
+          />
+          <input
+            type="email"
+            value={settingsDraft.profile.email}
+            onChange={(event) =>
+              setSettingsDraft((prev) => ({
+                ...prev,
+                profile: { ...prev.profile, email: event.target.value },
+              }))
+            }
+            placeholder="Primary email"
+            className="w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
+          />
+          <input
+            type="text"
+            value={settingsDraft.profile.designation}
+            onChange={(event) =>
+              setSettingsDraft((prev) => ({
+                ...prev,
+                profile: { ...prev.profile, designation: event.target.value },
+              }))
+            }
+            placeholder="Designation"
+            className="w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
+          />
+          <input
+            type="email"
+            value={settingsDraft.profile.notificationsEmail}
+            onChange={(event) =>
+              setSettingsDraft((prev) => ({
+                ...prev,
+                profile: { ...prev.profile, notificationsEmail: event.target.value },
+              }))
+            }
+            placeholder="Notifications email"
+            className="w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => handleSaveSettings('profile')}
+          className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-[#2B2B30] px-3 py-2 text-sm text-slate-100 transition hover:bg-[#1A1A1F]"
+        >
+          <CheckCircle2 className="h-4 w-4" /> Save profile
+        </button>
+      </div>
+
+      <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Media Storage</h2>
+
+        <div className="space-y-2">
+          <input
+            type="text"
+            value={settingsDraft.storage.provider}
+            readOnly
+            className="w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-slate-300 outline-none"
+          />
+
+          <input
+            type="number"
+            min="100"
+            value={settingsDraft.storage.maxUploadMb}
+            onChange={(event) =>
+              setSettingsDraft((prev) => ({
+                ...prev,
+                storage: { ...prev.storage, maxUploadMb: Number(event.target.value) || 0 },
+              }))
+            }
+            placeholder="Max upload MB"
+            className="w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
+          />
+
+          <input
+            type="text"
+            value={settingsDraft.storage.allowedFormats}
+            onChange={(event) =>
+              setSettingsDraft((prev) => ({
+                ...prev,
+                storage: { ...prev.storage, allowedFormats: event.target.value },
+              }))
+            }
+            placeholder="Allowed formats"
+            className="w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
+          />
+
+          <input
+            type="number"
+            min="1"
+            value={settingsDraft.storage.retentionDays}
+            onChange={(event) =>
+              setSettingsDraft((prev) => ({
+                ...prev,
+                storage: { ...prev.storage, retentionDays: Number(event.target.value) || 1 },
+              }))
+            }
+            placeholder="Retention days"
+            className="w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => handleSaveSettings('storage')}
+          className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-[#2B2B30] px-3 py-2 text-sm text-slate-100 transition hover:bg-[#1A1A1F]"
+        >
+          <CheckCircle2 className="h-4 w-4" /> Save storage
+        </button>
+      </div>
+
+      <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Permissions</h2>
+
+        <div className="space-y-2 text-sm text-slate-200">
+          <label className="flex items-center gap-2 rounded-md border border-[#1F1F23] bg-[#0F0F12] px-3 py-2">
+            <input
+              type="checkbox"
+              checked={settingsDraft.permissions.allowManualAccessGrant}
+              onChange={(event) =>
+                setSettingsDraft((prev) => ({
+                  ...prev,
+                  permissions: { ...prev.permissions, allowManualAccessGrant: event.target.checked },
+                }))
+              }
+            />
+            Allow manual access grant
+          </label>
+
+          <label className="flex items-center gap-2 rounded-md border border-[#1F1F23] bg-[#0F0F12] px-3 py-2">
+            <input
+              type="checkbox"
+              checked={settingsDraft.permissions.enableMultiAdminPreview}
+              onChange={(event) =>
+                setSettingsDraft((prev) => ({
+                  ...prev,
+                  permissions: { ...prev.permissions, enableMultiAdminPreview: event.target.checked },
+                }))
+              }
+            />
+            Enable multi-admin preview mode
+          </label>
+
+          <label className="flex items-center gap-2 rounded-md border border-[#1F1F23] bg-[#0F0F12] px-3 py-2">
+            <input
+              type="checkbox"
+              checked={settingsDraft.permissions.writeAuditLog}
+              onChange={(event) =>
+                setSettingsDraft((prev) => ({
+                  ...prev,
+                  permissions: { ...prev.permissions, writeAuditLog: event.target.checked },
+                }))
+              }
+            />
+            Keep audit logs enabled
+          </label>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => handleSaveSettings('permissions')}
+          className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-[#2B2B30] px-3 py-2 text-sm text-slate-100 transition hover:bg-[#1A1A1F]"
+        >
+          <CheckCircle2 className="h-4 w-4" /> Save permissions
+        </button>
+      </div>
+    </section>
+  )
+
+  const renderSection = () => {
+    if (visibleSection === SECTION_IDS.WORKSHOPS) return renderWorkshops()
+    if (visibleSection === SECTION_IDS.MODULES) return renderModules()
+    if (visibleSection === SECTION_IDS.UPLOAD) return renderUploadCenter()
+    if (visibleSection === SECTION_IDS.ACCESS) return renderAccessControl()
+    if (visibleSection === SECTION_IDS.ANALYTICS) return renderAnalytics()
+    if (visibleSection === SECTION_IDS.SETTINGS) return renderSettings()
+    if (visibleSection === 'communication') return renderCommunication()
+    if (visibleSection === 'support') return renderSupport()
+    return renderOverview()
+  }
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0F0F12] text-slate-200">
+        Loading super admin dashboard...
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-slate-950 text-white p-8">
-      <h1 className="text-3xl font-bold">Super Admin Dashboard</h1>
-      <p className="mt-2 text-slate-300">Full system controls and oversight.</p>
+    <div className="min-h-screen bg-[#0F0F12] text-white">
+      <div className="flex min-h-screen">
+        <SuperAdminSidebar
+          sections={sidebarSections}
+          activeSection={activeSection}
+          onChange={setActiveSection}
+          onLogout={handleLogout}
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+        />
+
+        <div className="flex min-h-screen flex-1 flex-col">
+          <SuperAdminTopbar
+            title={activeSectionMeta?.label || 'Super Admin Dashboard'}
+            subtitle="Recorded workshops LMS control panel"
+            onMenuClick={() => setIsSidebarOpen(true)}
+            notifications={snapshot.uploadJobs.filter((job) => job.status === 'uploading' || job.status === 'queued').length}
+            userName={user?.name || user?.email || 'Super Admin'}
+            onLogout={handleLogout}
+          />
+
+          <main className="flex-1 space-y-4 p-4 sm:p-6">
+            {error && (
+              <div className="rounded-md border border-rose-700/70 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+                {error}
+              </div>
+            )}
+
+            {notice && (
+              <div className="rounded-md border border-emerald-700/70 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+                {notice}
+              </div>
+            )}
+
+            <div className="rounded-xl border border-[#1F1F23] bg-[#111115] px-4 py-3 text-xs text-slate-400">
+              Controls include workshop CRUD, module/video structure, enrollment-based access, upload queue, analytics,
+              and storage/permission settings.
+            </div>
+
+            {renderSection()}
+          </main>
+        </div>
+      </div>
     </div>
   )
 }

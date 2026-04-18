@@ -5,6 +5,8 @@ import { setAuth } from '../utils/auth'
 import { buildApiUrl, parseJsonSafe } from '../utils/apiClient'
 import { useAuthState } from '../hooks/useAuth'
 
+const getRoleRedirect = (role) => (role === 'super_admin' ? '/admin/super-admin-dashboard' : '/admin/dashboard')
+
 const AdminLogin = () => {
   const navigate = useNavigate()
   const { user } = useAuthState()
@@ -14,7 +16,7 @@ const AdminLogin = () => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
-  const roleRedirect = '/admin/dashboard'
+  const roleRedirect = getRoleRedirect(user?.role)
 
   if (user && ['admin', 'instructor', 'super_admin'].includes(user.role)) {
     return <Navigate to={roleRedirect} replace />
@@ -52,7 +54,7 @@ const AdminLogin = () => {
       }
 
       setAuth(data.token, data.user)
-      navigate(roleRedirect, { replace: true })
+      navigate(getRoleRedirect(role), { replace: true })
     } catch (err) {
       console.error(err)
       setError(err?.message === 'API URL is not configured' ? 'Server config error: missing API URL' : 'Server error')
