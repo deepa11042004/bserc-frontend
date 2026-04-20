@@ -1,5 +1,4 @@
-import { ChevronDown, X } from 'lucide-react'
-import { useState } from 'react'
+import { X } from 'lucide-react'
 
 const SuperAdminSidebar = ({
   sections,
@@ -9,20 +8,6 @@ const SuperAdminSidebar = ({
   isOpen,
   onClose,
 }) => {
-  const [expandedGroups, setExpandedGroups] = useState(() =>
-    sections.reduce((acc, section) => {
-      if (section.items?.length) acc[section.title] = true
-      return acc
-    }, {}),
-  )
-
-  const toggleGroup = (title) => {
-    setExpandedGroups((prev) => ({
-      ...prev,
-      [title]: !prev[title],
-    }))
-  }
-
   const panel = (
     <aside className="flex h-full w-72 flex-col border-r border-[#1F1F23] bg-[#0F0F12]">
       <div className="flex h-16 items-center justify-between border-b border-[#1F1F23] px-5">
@@ -45,55 +30,41 @@ const SuperAdminSidebar = ({
         <div className="space-y-3">
           {sections.map((section) => {
             if (section.items) {
-              const isExpanded = expandedGroups[section.title]
-
               return (
-                <div key={section.title} className="overflow-hidden rounded-2xl border border-[#1F1F23] bg-[#0B0B0E]">
-                  <button
-                    type="button"
-                    onClick={() => toggleGroup(section.title)}
-                    className="flex w-full items-center justify-between gap-3 border-b border-[#1F1F23] px-4 py-3 text-left text-xs uppercase tracking-[0.18em] text-slate-400 transition hover:bg-[#131317]"
-                  >
-                    <span>{section.title}</span>
-                    <ChevronDown
-                      className={`h-4 w-4 transition-transform duration-200 ${
-                        isExpanded ? 'rotate-180' : 'rotate-0'
-                      }`}
-                    />
-                  </button>
+                <div key={section.title} className="rounded-2xl bg-transparent">
+                  <div className="px-4 py-3 text-xs uppercase tracking-[0.18em] text-slate-400">
+                    {section.title}
+                  </div>
+                  <div className="space-y-1 px-1 py-3">
+                    {section.items.map((item) => {
+                      const Icon = item.icon
+                      const isActive = activeSection === item.id
 
-                  {isExpanded && (
-                    <div className="space-y-1 px-1 py-3">
-                      {section.items.map((item) => {
-                        const Icon = item.icon
-                        const isActive = activeSection === item.id
-
-                        return (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => {
-                              onChange(item.id)
-                              onClose()
-                            }}
-                            className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition ${
-                              isActive
-                                ? 'bg-[#1F1F23] font-medium text-white'
-                                : 'text-slate-300 hover:bg-[#1A1A1F] hover:text-white'
-                            }`}
-                          >
-                            <span className="flex items-center gap-3">
-                              <Icon className="h-4 w-4" />
-                              <span>{item.label}</span>
-                            </span>
-                            {item.badge != null && (
-                              <span className="rounded-full bg-[#2B2B30] px-2 py-0.5 text-xs text-slate-200">{item.badge}</span>
-                            )}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  )}
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            onChange(item.id)
+                            onClose()
+                          }}
+                          className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition ${
+                            isActive
+                              ? 'bg-[#1F1F23] font-medium text-white'
+                              : 'text-slate-300 hover:bg-[#1A1A1F] hover:text-white'
+                          }`}
+                        >
+                          <span className="flex items-center gap-3">
+                            <Icon className="h-4 w-4" />
+                            <span>{item.label}</span>
+                          </span>
+                          {item.badge != null && (
+                            <span className="rounded-full bg-[#2B2B30] px-2 py-0.5 text-xs text-slate-200">{item.badge}</span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               )
             }
