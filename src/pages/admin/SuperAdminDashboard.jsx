@@ -29,10 +29,14 @@ import { lmsAdminService } from '../../services/lmsAdminService'
 import { useAuthState } from '../../hooks/useAuth'
 import { logoutAdmin } from '../../utils/auth'
 
-const WORKSHOP_DRAFT_KEY = 'bserc-lms-super-admin-workshop-draft-v1'
-
 const SECTION_IDS = {
   OVERVIEW: 'overview',
+  WORKSHOPS: 'workshops',
+  MODULES: 'modules',
+  UPLOAD: 'upload',
+  ACCESS: 'access',
+  ANALYTICS: 'analytics',
+  SETTINGS: 'settings',
   ALL_WORKSHOPS: 'all-workshops',
   CREATE_WORKSHOP: 'create-workshop',
   ALL_MODULES: 'all-modules',
@@ -60,9 +64,20 @@ const SECTION_IDS = {
 
 const INITIAL_WORKSHOP_FORM = {
   title: '',
+  slug: '',
+  subtitle: '',
   description: '',
-  status: 'draft',
-  originalWorkshopId: '',
+  category: 'Workshop',
+  level: 'Beginner',
+  language: 'English',
+  price: '',
+  discountPrice: '',
+  currency: 'INR',
+  isPaid: false,
+  lifetimeAccess: true,
+  certificateAvailable: true,
+  instructorId: '',
+  totalDurationMinutes: '',
   thumbnailFile: null,
 }
 
@@ -144,11 +159,31 @@ const formatFileSize = (bytes = 0) => {
   return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GB`
 }
 
+const formatInr = (value = 0) => {
+  const amount = Number(value)
+  if (!Number.isFinite(amount)) return 'INR 0'
+
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
+
 const stripFileExtension = (name = '') => {
   const index = name.lastIndexOf('.')
   if (index <= 0) return name
   return name.slice(0, index)
 }
+
+const slugifyWorkshop = (value = '') =>
+  String(value || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
 
 const sleep = (ms = 200) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -166,10 +201,9 @@ const SuperAdminDashboard = () => {
 
   const [workshopForm, setWorkshopForm] = useState(INITIAL_WORKSHOP_FORM)
   const [workshopThumbPreview, setWorkshopThumbPreview] = useState('')
-  const [editingWorkshopId, setEditingWorkshopId] = useState(null)
+  const [workshopSlugEdited, setWorkshopSlugEdited] = useState(false)
   const [workshopSearch, setWorkshopSearch] = useState('')
   const [workshopStatusFilter, setWorkshopStatusFilter] = useState('all')
-  const [draftSavedAt, setDraftSavedAt] = useState('')
 
   const [moduleWorkshopId, setModuleWorkshopId] = useState('')
   const [selectedModuleId, setSelectedModuleId] = useState('')
@@ -270,39 +304,26 @@ const SuperAdminDashboard = () => {
   }, [moduleWorkshopId, snapshot.workshops])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (workshopSlugEdited) return
 
-    try {
-      const raw = window.localStorage.getItem(WORKSHOP_DRAFT_KEY)
-      if (!raw) return
-      const parsed = JSON.parse(raw)
-
-      setWorkshopForm((prev) => ({
-        ...prev,
-        title: parsed.title || prev.title,
-        description: parsed.description || prev.description,
-        status: parsed.status || prev.status,
-        originalWorkshopId: parsed.originalWorkshopId || prev.originalWorkshopId,
-      }))
-    } catch {
-      // Ignore invalid draft values.
-    }
-  }, [])
+    const nextSlug = slugifyWorkshop(workshopForm.title)
+    setWorkshopForm((prev) => {
+      if ((prev.slug || '') === nextSlug) return prev
+      return { ...prev, slug: nextSlug }
+    })
+  }, [workshopForm.title, workshopSlugEdited])
 
   useEffect(() => {
-    if (editingWorkshopId) return
-    if (typeof window === 'undefined') return
-
-    const draftPayload = {
-      title: workshopForm.title,
-      description: workshopForm.description,
-      status: workshopForm.status,
-      originalWorkshopId: workshopForm.originalWorkshopId,
+    if (!workshopForm.thumbnailFile) {
+      setWorkshopThumbPreview('')
+      return undefined
     }
 
-    window.localStorage.setItem(WORKSHOP_DRAFT_KEY, JSON.stringify(draftPayload))
-    setDraftSavedAt(new Date().toISOString())
-  }, [workshopForm.title, workshopForm.description, workshopForm.status, workshopForm.originalWorkshopId, editingWorkshopId])
+    const preview = URL.createObjectURL(workshopForm.thumbnailFile)
+    setWorkshopThumbPreview(preview)
+
+    return () => URL.revokeObjectURL(preview)
+  }, [workshopForm.thumbnailFile])
 
   useEffect(() => {
     if (!uploadForm.videoFiles.length) {
@@ -558,7 +579,15 @@ const SuperAdminDashboard = () => {
       if (workshopStatusFilter !== 'all' && workshop.status !== workshopStatusFilter) return false
       if (!query) return true
 
-      return workshop.title.toLowerCase().includes(query) || workshop.description.toLowerCase().includes(query)
+      return [
+        workshop.title,
+        workshop.description,
+        workshop.slug,
+        workshop.category,
+        workshop.language,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query))
     })
   }, [snapshot.workshops, workshopSearch, workshopStatusFilter])
 
@@ -592,20 +621,12 @@ const SuperAdminDashboard = () => {
 
   const clearWorkshopForm = () => {
     setWorkshopForm(INITIAL_WORKSHOP_FORM)
-    setEditingWorkshopId(null)
+    setWorkshopSlugEdited(false)
     setWorkshopThumbPreview('')
   }
 
   const handleWorkshopThumbChange = (file) => {
     setWorkshopForm((prev) => ({ ...prev, thumbnailFile: file || null }))
-
-    if (!file) {
-      setWorkshopThumbPreview('')
-      return
-    }
-
-    const preview = URL.createObjectURL(file)
-    setWorkshopThumbPreview(preview)
   }
 
   const handleWorkshopSubmit = async (event) => {
@@ -616,60 +637,78 @@ const SuperAdminDashboard = () => {
     setError('')
 
     try {
-      const payload = {
-        title: workshopForm.title,
-        description: workshopForm.description,
-        status: workshopForm.status,
-        originalWorkshopId: workshopForm.originalWorkshopId || null,
-        thumbnailName: workshopForm.thumbnailFile?.name || null,
-        thumbnailBlobUrl: workshopForm.thumbnailFile ? URL.createObjectURL(workshopForm.thumbnailFile) : undefined,
+      const title = workshopForm.title.trim()
+      const slug = workshopForm.slug.trim() || slugifyWorkshop(title)
+      const category = workshopForm.category.trim()
+      const level = workshopForm.level.trim()
+      const language = workshopForm.language.trim()
+      const instructorId = Number.parseInt(String(workshopForm.instructorId || ''), 10)
+
+      const parsedPrice = workshopForm.price === '' ? null : Number(workshopForm.price)
+      const parsedDiscount = workshopForm.discountPrice === '' ? null : Number(workshopForm.discountPrice)
+      const parsedDuration = workshopForm.totalDurationMinutes === '' ? 0 : Number(workshopForm.totalDurationMinutes)
+
+      if (!title) throw new Error('Title is required.')
+      if (!slug) throw new Error('Slug is required.')
+      if (!category) throw new Error('Category is required.')
+      if (!level) throw new Error('Level is required.')
+      if (!['Beginner', 'Intermediate', 'Advanced'].includes(level)) {
+        throw new Error('Level must be Beginner, Intermediate, or Advanced.')
+      }
+      if (!language) throw new Error('Language is required.')
+      if (!Number.isInteger(instructorId) || instructorId <= 0) {
+        throw new Error('Valid Instructor ID is required.')
       }
 
-      if (editingWorkshopId) {
-        await lmsAdminService.updateWorkshop(editingWorkshopId, payload)
-        setFlash('Workshop updated successfully.')
-      } else {
-        await lmsAdminService.createWorkshop(payload)
-        setFlash('Recorded workshop created successfully.')
+      if (workshopForm.isPaid && (parsedPrice === null || !Number.isFinite(parsedPrice))) {
+        throw new Error('Price is required when Is Paid is enabled.')
       }
+
+      if (parsedPrice !== null && (!Number.isFinite(parsedPrice) || parsedPrice < 0)) {
+        throw new Error('Price must be greater than or equal to 0.')
+      }
+
+      const price = workshopForm.isPaid ? (parsedPrice ?? 0) : 0
+
+      if (parsedDiscount !== null && (!Number.isFinite(parsedDiscount) || parsedDiscount < 0)) {
+        throw new Error('Discount Price must be greater than or equal to 0.')
+      }
+
+      if (parsedDiscount !== null && parsedDiscount > price) {
+        throw new Error('Discount Price cannot be greater than Price.')
+      }
+
+      if (!Number.isFinite(parsedDuration) || parsedDuration < 0) {
+        throw new Error('Total Duration must be greater than or equal to 0.')
+      }
+
+      const payload = {
+        title,
+        slug,
+        subtitle: workshopForm.subtitle,
+        description: workshopForm.description,
+        category,
+        level,
+        language,
+        price,
+        discountPrice: parsedDiscount,
+        currency: workshopForm.currency || 'INR',
+        isPaid: workshopForm.isPaid,
+        lifetimeAccess: workshopForm.lifetimeAccess,
+        certificateAvailable: workshopForm.certificateAvailable,
+        instructorId,
+        totalDurationMinutes: Math.round(parsedDuration),
+        thumbnailFile: workshopForm.thumbnailFile || null,
+      }
+
+      await lmsAdminService.createWorkshop(payload)
+      setFlash('Workshop created in courses table successfully.')
 
       clearWorkshopForm()
       await loadSnapshot({ silent: true })
     } catch (err) {
       console.error(err)
       setError(err?.message || 'Could not save workshop.')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const handleWorkshopEdit = (workshop) => {
-    setEditingWorkshopId(workshop.id)
-    setWorkshopForm({
-      title: workshop.title,
-      description: workshop.description,
-      status: workshop.status,
-      originalWorkshopId: workshop.originalWorkshopId ? String(workshop.originalWorkshopId) : '',
-      thumbnailFile: null,
-    })
-    setWorkshopThumbPreview(workshop.thumbnailBlobUrl || '')
-    setActiveSection(SECTION_IDS.WORKSHOPS)
-  }
-
-  const handleWorkshopDelete = async (workshopId) => {
-    if (busy) return
-
-    setBusy(true)
-    setError('')
-
-    try {
-      await lmsAdminService.deleteWorkshop(workshopId)
-      if (editingWorkshopId === workshopId) clearWorkshopForm()
-      setFlash('Workshop deleted.')
-      await loadSnapshot({ silent: true })
-    } catch (err) {
-      console.error(err)
-      setError(err?.message || 'Could not delete workshop.')
     } finally {
       setBusy(false)
     }
@@ -1087,11 +1126,17 @@ const SuperAdminDashboard = () => {
     </section>
   )
 
-  const renderWorkshops = () => (
-    <section className="grid gap-4 xl:grid-cols-[2fr_1fr]">
-      <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
+  const renderAllWorkshops = () => (
+    <section className="space-y-4">
+      {snapshot.courseSync && !snapshot.courseSync.ok && (
+        <div className="rounded-xl border border-amber-700/70 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          Courses table sync is currently unavailable. Please ensure backend is running and reachable.
+        </div>
+      )}
+
+      <div className="rounded-xl border border-sky-600/20 bg-slate-900 p-4 shadow-xl shadow-sky-500/10">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Recorded Workshops</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-sky-300">All Workshops</h2>
 
           <div className="flex flex-wrap items-center gap-2">
             <label className="flex items-center gap-2 rounded-md border border-[#2B2B30] px-3 py-2 text-sm text-slate-300">
@@ -1100,188 +1145,359 @@ const SuperAdminDashboard = () => {
                 type="text"
                 value={workshopSearch}
                 onChange={(event) => setWorkshopSearch(event.target.value)}
-                placeholder="Search workshops"
-                className="w-44 bg-transparent outline-none"
+                placeholder="Search title, slug, category"
+                className="w-52 bg-transparent outline-none"
               />
             </label>
 
             <select
               value={workshopStatusFilter}
               onChange={(event) => setWorkshopStatusFilter(event.target.value)}
-              className="rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-slate-200 outline-none"
+              className="rounded-md border border-sky-700/40 bg-slate-900 px-3 py-2 text-sm text-slate-200 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
             >
               <option value="all">All statuses</option>
-              <option value="draft">Draft</option>
               <option value="published">Published</option>
             </select>
-          </div>
-        </div>
 
-        <div className="space-y-2">
-          {filteredWorkshops.map((workshop) => (
-            <div key={workshop.id} className="rounded-md border border-[#1F1F23] bg-[#0F0F12] p-3">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold text-white">{workshop.title}</div>
-                  <p className="mt-1 line-clamp-2 text-xs text-slate-400">{workshop.description || 'No description yet.'}</p>
-                </div>
-
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs ${
-                    workshop.status === 'published'
-                      ? 'bg-emerald-500/15 text-emerald-300'
-                      : 'bg-amber-500/15 text-amber-300'
-                  }`}
-                >
-                  {workshop.status}
-                </span>
-              </div>
-
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
-                <div>
-                  Modules: {workshop.modules.length} • Videos: {totalVideosByWorkshop(workshop)}
-                </div>
-                <div>
-                  Source workshop: {workshop.originalWorkshopId || 'Not linked'}
-                </div>
-              </div>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleWorkshopEdit(workshop)}
-                  className="inline-flex items-center gap-1 rounded-md border border-[#2B2B30] px-2 py-1 text-xs text-slate-200 transition hover:bg-[#1A1A1F]"
-                >
-                  <Pencil className="h-3.5 w-3.5" /> Edit
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleWorkshopDelete(workshop.id)}
-                  className="inline-flex items-center gap-1 rounded-md border border-rose-700/60 px-2 py-1 text-xs text-rose-200 transition hover:bg-rose-500/10"
-                >
-                  <Trash2 className="h-3.5 w-3.5" /> Delete
-                </button>
-              </div>
-            </div>
-          ))}
-
-          {!filteredWorkshops.length && (
-            <div className="rounded-md border border-dashed border-[#2B2B30] px-3 py-8 text-center text-sm text-slate-400">
-              No workshops match your filter.
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">
-            {editingWorkshopId ? 'Edit Workshop' : 'Create Workshop'}
-          </h2>
-
-          {editingWorkshopId && (
             <button
               type="button"
-              onClick={clearWorkshopForm}
-              className="text-xs text-slate-400 transition hover:text-slate-200"
+              onClick={() => {
+                void loadSnapshot({ silent: true })
+              }}
+              className="inline-flex items-center gap-2 rounded-md border border-sky-500/40 bg-sky-600 px-3 py-2 text-sm text-white transition hover:bg-sky-500"
             >
-              Cancel edit
+              <RefreshCw className="h-4 w-4" /> Refresh
             </button>
-          )}
+          </div>
         </div>
 
-        <form className="space-y-3" onSubmit={handleWorkshopSubmit}>
-          <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
-            Title
-            <input
-              type="text"
-              value={workshopForm.title}
-              onChange={(event) => setWorkshopForm((prev) => ({ ...prev, title: event.target.value }))}
-              placeholder="Recorded workshop title"
-              className="mt-1 w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
-              required
-            />
-          </label>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {filteredWorkshops.map((workshop) => {
+            const thumbnailSource = workshop.thumbnailBlobUrl || workshop.thumbnailUrl || ''
 
-          <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
-            Description
-            <textarea
-              value={workshopForm.description}
-              onChange={(event) => setWorkshopForm((prev) => ({ ...prev, description: event.target.value }))}
-              rows={4}
-              placeholder="Describe what students will get from this recording"
-              className="mt-1 w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
-            />
-          </label>
+            return (
+              <article key={workshop.id} className="overflow-hidden rounded-lg border border-slate-800 bg-slate-950 shadow-sm shadow-sky-500/5">
+                {thumbnailSource ? (
+                  <img src={thumbnailSource} alt={workshop.title} className="h-36 w-full object-cover" />
+                ) : (
+                  <div className="h-36 w-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950" />
+                )}
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
-              Status
-              <select
-                value={workshopForm.status}
-                onChange={(event) => setWorkshopForm((prev) => ({ ...prev, status: event.target.value }))}
-                className="mt-1 w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
-              >
-                <option value="draft">Draft</option>
-                <option value="published">Published</option>
-              </select>
-            </label>
+                <div className="space-y-3 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-sm font-semibold text-sky-100">{workshop.title}</h3>
+                      <div className="mt-1 truncate text-xs text-slate-400">/{workshop.slug || 'slug-not-set'}</div>
+                    </div>
 
-            <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
-              Source Workshop
-              <select
-                value={workshopForm.originalWorkshopId}
-                onChange={(event) => setWorkshopForm((prev) => ({ ...prev, originalWorkshopId: event.target.value }))}
-                className="mt-1 w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
-              >
-                <option value="">Not linked</option>
-                {snapshot.liveWorkshops.map((workshop) => (
-                  <option key={workshop.id} value={String(workshop.id)}>
-                    {workshop.title}
-                  </option>
-                ))}
-              </select>
-            </label>
+                    <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] text-sky-200">courses table</span>
+                  </div>
+
+                  <p className="line-clamp-3 text-xs text-slate-400">{workshop.description || 'No description yet.'}</p>
+
+                  <div className="grid gap-1 text-xs text-slate-300">
+                    <div>Category: {workshop.category || 'Workshop'} | Level: {workshop.level || 'Beginner'}</div>
+                    <div>Language: {workshop.language || 'English'}</div>
+                    <div>Modules: {workshop.modules.length} | Videos: {totalVideosByWorkshop(workshop)}</div>
+                    <div>Instructor ID: {workshop.instructorId || workshop.instructor_id || '—'}</div>
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-md border border-slate-800 bg-slate-900 px-2.5 py-2 text-xs text-slate-200">
+                    <span className="text-emerald-200">{formatInr(workshop.price || 0)}</span>
+                    <span className="text-slate-300">{workshop.enrolledStudents || 0} enrolled</span>
+                  </div>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+
+        {!filteredWorkshops.length && (
+          <div className="mt-3 rounded-md border border-dashed border-[#2B2B30] px-3 py-8 text-center text-sm text-slate-400">
+            No workshops match your filter.
           </div>
-
-          <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
-            Thumbnail
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(event) => handleWorkshopThumbChange(event.target.files?.[0])}
-              className="mt-1 w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-slate-200"
-            />
-          </label>
-
-          {workshopThumbPreview && (
-            <img
-              src={workshopThumbPreview}
-              alt="Workshop thumbnail preview"
-              className="h-28 w-full rounded-md border border-[#1F1F23] object-cover"
-            />
-          )}
-
-          {!editingWorkshopId && draftSavedAt && (
-            <div className="text-xs text-slate-500">Draft autosaved at {formatDateTime(draftSavedAt)}</div>
-          )}
-
-          <button
-            type="submit"
-            disabled={busy}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-cyan-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-500 disabled:opacity-70"
-          >
-            {editingWorkshopId ? 'Update workshop' : 'Create workshop'}
-          </button>
-        </form>
+        )}
       </div>
     </section>
   )
 
+  const renderCreateWorkshop = () => (
+    <section className="space-y-4">
+      {snapshot.courseSync && !snapshot.courseSync.ok && (
+        <div className="rounded-xl border border-amber-700/70 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          Courses table sync is currently unavailable. Please ensure backend is running and reachable.
+        </div>
+      )}
+
+      <div className="space-y-4">
+<div className="rounded-xl border border-sky-600/20 bg-slate-900 p-4 shadow-xl shadow-sky-500/10">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-sky-300">Create Workshop</h2>
+          </div>
+
+          <form className="space-y-3" onSubmit={handleWorkshopSubmit}>
+            <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
+              Workshop title
+              <input
+                type="text"
+                value={workshopForm.title}
+                onChange={(event) => setWorkshopForm((prev) => ({ ...prev, title: event.target.value }))}
+                placeholder="Satellite Design Foundation"
+                className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                required
+              />
+            </label>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
+                Slug
+                <input
+                  type="text"
+                  value={workshopForm.slug}
+                  onChange={(event) => {
+                    setWorkshopSlugEdited(true)
+                    setWorkshopForm((prev) => ({ ...prev, slug: event.target.value }))
+                  }}
+                  placeholder="satellite-design-foundation"
+                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                  required
+                />
+              </label>
+
+              <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
+                Subtitle
+                <input
+                  type="text"
+                  value={workshopForm.subtitle}
+                  onChange={(event) => setWorkshopForm((prev) => ({ ...prev, subtitle: event.target.value }))}
+                  placeholder="Structured recording track for LMS"
+                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                />
+              </label>
+            </div>
+
+            <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
+              Description
+              <textarea
+                value={workshopForm.description}
+                onChange={(event) => setWorkshopForm((prev) => ({ ...prev, description: event.target.value }))}
+                rows={3}
+                placeholder="What this workshop recording covers"
+                className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+              />
+            </label>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
+                Category
+                <input
+                  type="text"
+                  value={workshopForm.category}
+                  onChange={(event) => setWorkshopForm((prev) => ({ ...prev, category: event.target.value }))}
+                  placeholder="Workshop"
+                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                />
+              </label>
+
+              <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
+                Level
+                <select
+                  value={workshopForm.level}
+                  onChange={(event) => setWorkshopForm((prev) => ({ ...prev, level: event.target.value }))}
+                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                >
+                  <option value="Beginner">Beginner</option>
+                  <option value="Intermediate">Intermediate</option>
+                  <option value="Advanced">Advanced</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
+                Language
+                <input
+                  type="text"
+                  value={workshopForm.language}
+                  onChange={(event) => setWorkshopForm((prev) => ({ ...prev, language: event.target.value }))}
+                  placeholder="English"
+                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                  required
+                />
+              </label>
+
+              <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
+                Instructor ID
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={workshopForm.instructorId}
+                  onChange={(event) => setWorkshopForm((prev) => ({ ...prev, instructorId: event.target.value }))}
+                  placeholder="e.g. 12"
+                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                  required
+                />
+              </label>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
+                Price
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={workshopForm.price}
+                  onChange={(event) => setWorkshopForm((prev) => ({ ...prev, price: event.target.value }))}
+                  placeholder="0"
+                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                />
+              </label>
+
+              <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
+                Discount Price
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={workshopForm.discountPrice}
+                  onChange={(event) => setWorkshopForm((prev) => ({ ...prev, discountPrice: event.target.value }))}
+                  placeholder="Optional"
+                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                />
+              </label>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
+                Currency
+                <input
+                  type="text"
+                  value={workshopForm.currency}
+                  onChange={(event) => setWorkshopForm((prev) => ({ ...prev, currency: event.target.value.toUpperCase() }))}
+                  placeholder="INR"
+                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                />
+              </label>
+
+              <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
+                Total Duration (minutes)
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={workshopForm.totalDurationMinutes}
+                  onChange={(event) => setWorkshopForm((prev) => ({ ...prev, totalDurationMinutes: event.target.value }))}
+                  placeholder="0"
+                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                />
+              </label>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label className="flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs uppercase tracking-[0.12em] text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={workshopForm.isPaid}
+                  onChange={(event) => setWorkshopForm((prev) => ({ ...prev, isPaid: event.target.checked }))}
+                  className="h-4 w-4 accent-sky-400"
+                />
+                Is Paid
+              </label>
+
+              <label className="flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs uppercase tracking-[0.12em] text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={workshopForm.lifetimeAccess}
+                  onChange={(event) => setWorkshopForm((prev) => ({ ...prev, lifetimeAccess: event.target.checked }))}
+                  className="h-4 w-4 accent-sky-400"
+                />
+                Lifetime Access
+              </label>
+
+              <label className="flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs uppercase tracking-[0.12em] text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={workshopForm.certificateAvailable}
+                  onChange={(event) => setWorkshopForm((prev) => ({ ...prev, certificateAvailable: event.target.checked }))}
+                  className="h-4 w-4 accent-sky-400"
+                />
+                Certificate Available
+              </label>
+            </div>
+
+            <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
+              Thumbnail Upload
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(event) => handleWorkshopThumbChange(event.target.files?.[0])}
+                className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+              />
+            </label>
+
+            {workshopThumbPreview && (
+              <img
+                src={workshopThumbPreview}
+                alt="Workshop thumbnail preview"
+                className="h-32 w-full rounded-md border border-[#1F1F23] object-cover"
+              />
+            )}
+
+            <button
+              type="submit"
+              disabled={busy}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:opacity-70"
+            >
+              Create workshop in courses table
+            </button>
+          </form>
+        </div>
+
+        <div className="rounded-xl border border-sky-600/20 bg-slate-900 p-4">
+          <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-300">Live Preview</h3>
+
+          <div className="mt-3 rounded-md border border-slate-800 bg-slate-900 p-3">
+            <div className="text-sm font-semibold text-white">{workshopForm.title || 'Workshop title preview'}</div>
+            <div className="mt-1 text-xs text-slate-400">/{workshopForm.slug || 'auto-generated-slug'}</div>
+            <p className="mt-2 line-clamp-3 text-xs text-slate-400">
+              {workshopForm.description || 'Your workshop summary will appear here.'}
+            </p>
+
+            <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+              <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-sky-200">
+                {workshopForm.category || 'Workshop'}
+              </span>
+              <span className="rounded-full bg-slate-700/20 px-2 py-0.5 text-slate-200">
+                {workshopForm.level || 'Beginner'}
+              </span>
+              <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-emerald-200">
+                {workshopForm.language || 'English'}
+              </span>
+              <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-amber-200">
+                {workshopForm.isPaid
+                  ? `${workshopForm.currency || 'INR'} ${workshopForm.price || 0}`
+                  : 'Free'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+
+  const renderWorkshops = () => {
+    if (activeSection === SECTION_IDS.CREATE_WORKSHOP) {
+      return renderCreateWorkshop()
+    }
+
+    return renderAllWorkshops()
+  }
+
   const renderModules = () => (
     <section className="grid gap-4 xl:grid-cols-[1.2fr_2fr]">
-      <div className="space-y-4 rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
+      <div className="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-4 shadow-lg shadow-sky-500/5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Module Builder</h2>
 
@@ -1304,12 +1520,12 @@ const SuperAdminDashboard = () => {
             value={newModuleTitle}
             onChange={(event) => setNewModuleTitle(event.target.value)}
             placeholder="New module title"
-            className="min-w-0 flex-1 rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
+            className="min-w-0 flex-1 rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
           />
 
           <button
             type="submit"
-            className="inline-flex items-center gap-1 rounded-md border border-[#2B2B30] px-3 py-2 text-sm text-slate-100 transition hover:bg-[#1A1A1F]"
+            className="inline-flex items-center gap-1 rounded-md border border-slate-700 px-3 py-2 text-sm text-slate-100 transition hover:bg-slate-800"
           >
             <Plus className="h-4 w-4" /> Add
           </button>
@@ -1330,7 +1546,7 @@ const SuperAdminDashboard = () => {
                 className={`rounded-md border px-3 py-2 transition ${
                   selectedModuleId === module.id
                     ? 'border-cyan-700 bg-cyan-700/10'
-                    : 'border-[#1F1F23] bg-[#0F0F12] hover:border-[#2B2B30]'
+                    : 'border-slate-800 bg-slate-950 hover:border-slate-700'
                 }`}
               >
                 <button
@@ -1346,7 +1562,7 @@ const SuperAdminDashboard = () => {
                   <button
                     type="button"
                     onClick={() => handleRenameModule(module)}
-                    className="inline-flex items-center gap-1 rounded-md border border-[#2B2B30] px-2 py-1 text-xs text-slate-200 transition hover:bg-[#1A1A1F]"
+                    className="inline-flex items-center gap-1 rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-200 transition hover:bg-slate-800"
                   >
                     <Pencil className="h-3.5 w-3.5" /> Rename
                   </button>
@@ -2157,14 +2373,14 @@ const SuperAdminDashboard = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0F0F12] text-slate-200">
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-200">
         Loading super admin dashboard...
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#0F0F12] text-white">
+    <div className="min-h-screen bg-slate-950 text-white">
       <div className="flex min-h-screen">
         <SuperAdminSidebar
           sections={sidebarSections}
@@ -2175,7 +2391,7 @@ const SuperAdminDashboard = () => {
           onClose={() => setIsSidebarOpen(false)}
         />
 
-        <div className="flex min-h-screen flex-1 flex-col">
+        <div className="flex min-h-screen flex-1 flex-col lg:pl-72">
           <SuperAdminTopbar
             title={activeSectionMeta?.label || 'Super Admin Dashboard'}
             subtitle="Recorded workshops LMS control panel"

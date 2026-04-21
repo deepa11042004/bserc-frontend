@@ -9,7 +9,7 @@ const SuperAdminSidebar = ({
   onClose,
 }) => {
   const panel = (
-    <aside className="flex h-full w-72 flex-col border-r border-[#1F1F23] bg-[#0F0F12]">
+    <aside className="flex h-full w-72 flex-col border-r border-[#1F1F23] bg-[#0F0F12] lg:fixed lg:top-0 lg:left-0 lg:h-screen">
       <div className="flex h-16 items-center justify-between border-b border-[#1F1F23] px-5">
         <div>
           <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">BSERC LMS</div>
@@ -19,7 +19,7 @@ const SuperAdminSidebar = ({
         <button
           type="button"
           onClick={onClose}
-          className="rounded-md border border-[#2B2B30] p-1 text-slate-300 transition hover:bg-[#1A1A1F] lg:hidden"
+          className="rounded-md border border-slate-700 p-1 text-slate-300 transition hover:bg-sky-600/10 hover:text-sky-200 lg:hidden"
           aria-label="Close sidebar"
         >
           <X className="h-4 w-4" />
@@ -50,8 +50,8 @@ const SuperAdminSidebar = ({
                           }}
                           className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition ${
                             isActive
-                              ? 'bg-[#1F1F23] font-medium text-white'
-                              : 'text-slate-300 hover:bg-[#1A1A1F] hover:text-white'
+                              ? 'bg-slate-800 font-medium text-white'
+                              : 'text-slate-300 hover:bg-sky-600/10 hover:text-sky-200'
                           }`}
                         >
                           <span className="flex items-center gap-3">
@@ -82,8 +82,8 @@ const SuperAdminSidebar = ({
                 }}
                 className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition ${
                   isActive
-                    ? 'bg-[#1F1F23] font-medium text-white'
-                    : 'text-slate-300 hover:bg-[#1A1A1F] hover:text-white'
+                    ? 'bg-slate-800 font-medium text-white'
+                    : 'text-slate-300 hover:bg-sky-600/10 hover:text-sky-200'
                 }`}
               >
                 <span className="flex items-center gap-3">
