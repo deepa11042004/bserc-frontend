@@ -47,7 +47,7 @@ const SuperAdminTopbar = ({
         <button
           type="button"
           onClick={onLogout}
-          className="rounded-md border border-[#2B2B30] p-2 text-slate-300 transition hover:bg-[#1A1A1F]"
+          className="rounded-md border border-red-500 bg-red-600 px-3 py-2 text-sm font-medium text-white transition duration-200 hover:bg-red-700 hover:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-400"
           aria-label="Logout"
           title="Logout"
         >

@@ -373,11 +373,6 @@ const SuperAdminDashboard = () => {
             badge: snapshot.workshops.length,
           },
           {
-            id: SECTION_IDS.CREATE_WORKSHOP,
-            label: 'Create Workshop',
-            icon: Plus,
-          },
-          {
             id: SECTION_IDS.ALL_MODULES,
             label: 'All Modules',
             icon: FolderKanban,
@@ -1164,9 +1159,16 @@ const SuperAdminDashboard = () => {
               onClick={() => {
                 void loadSnapshot({ silent: true })
               }}
-              className="inline-flex items-center gap-2 rounded-md border border-sky-500/40 bg-sky-600 px-3 py-2 text-sm text-white transition hover:bg-sky-500"
+              className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white transition hover:bg-slate-700"
             >
               <RefreshCw className="h-4 w-4" /> Refresh
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveSection(SECTION_IDS.CREATE_WORKSHOP)}
+              className="inline-flex items-center gap-2 rounded-md border border-sky-500/40 bg-sky-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-sky-500 shadow-sm shadow-sky-500/20"
+            >
+              <Plus className="h-4 w-4" /> Create Workshop
             </button>
           </div>
         </div>
@@ -2414,10 +2416,10 @@ const SuperAdminDashboard = () => {
               </div>
             )}
 
-            <div className="rounded-xl border border-[#1F1F23] bg-[#111115] px-4 py-3 text-xs text-slate-400">
+            {/* <div className="rounded-xl border border-[#1F1F23] bg-[#111115] px-4 py-3 text-xs text-slate-400">
               Controls include workshop CRUD, module/video structure, enrollment-based access, upload queue, analytics,
               and storage/permission settings.
-            </div>
+            </div> */}
 
             {renderSection()}
           </main>

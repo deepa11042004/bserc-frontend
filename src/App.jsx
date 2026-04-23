@@ -11,6 +11,7 @@ import Profile from "./pages/Profile";
 import Search from "./pages/Search";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import SuperAdminDashboard from "./pages/admin/SuperAdminDashboard";
+import WorkshopBuilder from "./pages/admin/WorkshopBuilder";
 import AdminLogin from "./pages/AdminLogin";
 import ProtectedUserRoute from "./components/routes/ProtectedUserRoute";
 import ProtectedAdminRoute from "./components/routes/ProtectedAdminRoute";
@@ -77,6 +78,14 @@ function App() {
         element={
           <ProtectedAdminRoute allowedRoles={["super_admin"]}>
             <SuperAdminDashboard />
+          </ProtectedAdminRoute>
+        }
+      />
+      <Route
+        path="/superadmin/workshops/:id/builder"
+        element={
+          <ProtectedAdminRoute allowedRoles={["super_admin"]}>
+            <WorkshopBuilder />
           </ProtectedAdminRoute>
         }
       />

@@ -26,7 +26,7 @@ const SuperAdminSidebar = ({
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex-1 overflow-y-auto p-4 [scrollbar-width:thin] [scrollbar-color:#334155_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-700 hover:[&::-webkit-scrollbar-thumb]:bg-slate-600">
         <div className="space-y-3">
           {sections.map((section) => {
             if (section.items) {
@@ -48,11 +48,10 @@ const SuperAdminSidebar = ({
                             onChange(item.id)
                             onClose()
                           }}
-                          className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition ${
-                            isActive
-                              ? 'bg-slate-800 font-medium text-white'
-                              : 'text-slate-300 hover:bg-sky-600/10 hover:text-sky-200'
-                          }`}
+                          className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition ${isActive
+                            ? 'bg-slate-800 font-medium text-white'
+                            : 'text-slate-300 hover:bg-sky-600/10 hover:text-sky-200'
+                            }`}
                         >
                           <span className="flex items-center gap-3">
                             <Icon className="h-4 w-4" />
@@ -80,11 +79,10 @@ const SuperAdminSidebar = ({
                   onChange(section.id)
                   onClose()
                 }}
-                className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition ${
-                  isActive
-                    ? 'bg-slate-800 font-medium text-white'
-                    : 'text-slate-300 hover:bg-sky-600/10 hover:text-sky-200'
-                }`}
+                className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition ${isActive
+                  ? 'bg-slate-800 font-medium text-white'
+                  : 'text-slate-300 hover:bg-sky-600/10 hover:text-sky-200'
+                  }`}
               >
                 <span className="flex items-center gap-3">
                   <Icon className="h-4 w-4" />
@@ -103,7 +101,7 @@ const SuperAdminSidebar = ({
         <button
           type="button"
           onClick={onLogout}
-          className="w-full rounded-md border border-[#2B2B30] px-3 py-2 text-sm font-medium text-rose-200 transition hover:bg-rose-500/10"
+          class="w-full rounded-md border border-red-500 bg-red-600 px-3 py-2 text-sm font-medium text-white transition duration-200 hover:bg-red-700 hover:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-400"
         >
           Logout
         </button>
@@ -116,9 +114,8 @@ const SuperAdminSidebar = ({
       <div className="hidden h-screen lg:block">{panel}</div>
 
       <div
-        className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 lg:hidden ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 lg:hidden ${isOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
       >
         {panel}
       </div>
