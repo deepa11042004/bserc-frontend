@@ -28,6 +28,7 @@ import SuperAdminMetricCard from '../../components/superAdmin/SuperAdminMetricCa
 import { lmsAdminService } from '../../services/lmsAdminService'
 import { useAuthState } from '../../hooks/useAuth'
 import { logoutAdmin } from '../../utils/auth'
+import WorkshopContentPage from './WorkshopContentPage'
 
 const SECTION_IDS = {
   OVERVIEW: 'overview',
@@ -192,6 +193,7 @@ const SuperAdminDashboard = () => {
   const { user } = useAuthState()
 
   const [activeSection, setActiveSection] = useState(SECTION_IDS.OVERVIEW)
+  const [selectedWorkshopForBuilder, setSelectedWorkshopForBuilder] = useState(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -372,26 +374,6 @@ const SuperAdminDashboard = () => {
             icon: BookOpenCheck,
             badge: snapshot.workshops.length,
           },
-          {
-            id: SECTION_IDS.ALL_MODULES,
-            label: 'All Modules',
-            icon: FolderKanban,
-          },
-          {
-            id: SECTION_IDS.CREATE_MODULE,
-            label: 'Create Module',
-            icon: Plus,
-          },
-          {
-            id: SECTION_IDS.ALL_VIDEOS,
-            label: 'All Videos',
-            icon: PlayCircle,
-          },
-          {
-            id: SECTION_IDS.UPLOAD_VIDEO,
-            label: 'Upload Video',
-            icon: UploadCloud,
-          },
         ],
       },
       {
@@ -532,8 +514,6 @@ const SuperAdminDashboard = () => {
 
   const visibleSection = useMemo(() => {
     if ([SECTION_IDS.ALL_WORKSHOPS, SECTION_IDS.CREATE_WORKSHOP].includes(activeSection)) return SECTION_IDS.WORKSHOPS
-    if ([SECTION_IDS.ALL_MODULES, SECTION_IDS.CREATE_MODULE].includes(activeSection)) return SECTION_IDS.MODULES
-    if ([SECTION_IDS.ALL_VIDEOS, SECTION_IDS.UPLOAD_VIDEO].includes(activeSection)) return SECTION_IDS.UPLOAD
     if ([SECTION_IDS.UPLOAD_CENTER, SECTION_IDS.UPLOAD_PROGRESS, SECTION_IDS.MEDIA_LIBRARY].includes(activeSection)) return SECTION_IDS.UPLOAD
     if ([SECTION_IDS.ALL_STUDENTS, SECTION_IDS.ENROLLED_STUDENTS, SECTION_IDS.GRANT_ACCESS, SECTION_IDS.REVOKE_ACCESS].includes(activeSection)) return SECTION_IDS.ACCESS
     if ([SECTION_IDS.ANALYTICS_OVERVIEW, SECTION_IDS.WORKSHOP_PERFORMANCE, SECTION_IDS.VIDEO_ENGAGEMENT].includes(activeSection)) return SECTION_IDS.ANALYTICS
@@ -1073,13 +1053,12 @@ const SuperAdminDashboard = () => {
                   <div className="text-xs text-slate-400">{formatFileSize(job.fileSize)}</div>
                 </div>
                 <span
-                  className={`rounded-full px-2 py-0.5 text-xs ${
-                    job.status === 'completed'
+                  className={`rounded-full px-2 py-0.5 text-xs ${job.status === 'completed'
                       ? 'bg-emerald-500/15 text-emerald-300'
                       : job.status === 'failed'
-                      ? 'bg-rose-500/15 text-rose-300'
-                      : 'bg-amber-500/15 text-amber-300'
-                  }`}
+                        ? 'bg-rose-500/15 text-rose-300'
+                        : 'bg-amber-500/15 text-amber-300'
+                    }`}
                 >
                   {job.status}
                 </span>
@@ -1121,107 +1100,122 @@ const SuperAdminDashboard = () => {
     </section>
   )
 
-  const renderAllWorkshops = () => (
-    <section className="space-y-4">
-      {snapshot.courseSync && !snapshot.courseSync.ok && (
-        <div className="rounded-xl border border-amber-700/70 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-          Courses table sync is currently unavailable. Please ensure backend is running and reachable.
-        </div>
-      )}
+  const renderAllWorkshops = () => {
+    if (selectedWorkshopForBuilder) {
+      return (
+        <WorkshopContentPage
+          workshop={selectedWorkshopForBuilder}
+          onBack={() => setSelectedWorkshopForBuilder(null)}
+        />
+      )
+    }
 
-      <div className="rounded-xl border border-sky-600/20 bg-slate-900 p-4 shadow-xl shadow-sky-500/10">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-sky-300">All Workshops</h2>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-2 rounded-md border border-[#2B2B30] px-3 py-2 text-sm text-slate-300">
-              <Search className="h-4 w-4 text-slate-500" />
-              <input
-                type="text"
-                value={workshopSearch}
-                onChange={(event) => setWorkshopSearch(event.target.value)}
-                placeholder="Search title, slug, category"
-                className="w-52 bg-transparent outline-none"
-              />
-            </label>
-
-            <select
-              value={workshopStatusFilter}
-              onChange={(event) => setWorkshopStatusFilter(event.target.value)}
-              className="rounded-md border border-sky-700/40 bg-slate-900 px-3 py-2 text-sm text-slate-200 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
-            >
-              <option value="all">All statuses</option>
-              <option value="published">Published</option>
-            </select>
-
-            <button
-              type="button"
-              onClick={() => {
-                void loadSnapshot({ silent: true })
-              }}
-              className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white transition hover:bg-slate-700"
-            >
-              <RefreshCw className="h-4 w-4" /> Refresh
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveSection(SECTION_IDS.CREATE_WORKSHOP)}
-              className="inline-flex items-center gap-2 rounded-md border border-sky-500/40 bg-sky-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-sky-500 shadow-sm shadow-sky-500/20"
-            >
-              <Plus className="h-4 w-4" /> Create Workshop
-            </button>
-          </div>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {filteredWorkshops.map((workshop) => {
-            const thumbnailSource = workshop.thumbnailBlobUrl || workshop.thumbnailUrl || ''
-
-            return (
-              <article key={workshop.id} className="overflow-hidden rounded-lg border border-slate-800 bg-slate-950 shadow-sm shadow-sky-500/5">
-                {thumbnailSource ? (
-                  <img src={thumbnailSource} alt={workshop.title} className="h-36 w-full object-cover" />
-                ) : (
-                  <div className="h-36 w-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950" />
-                )}
-
-                <div className="space-y-3 p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <h3 className="truncate text-sm font-semibold text-sky-100">{workshop.title}</h3>
-                      <div className="mt-1 truncate text-xs text-slate-400">/{workshop.slug || 'slug-not-set'}</div>
-                    </div>
-
-                    <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] text-sky-200">courses table</span>
-                  </div>
-
-                  <p className="line-clamp-3 text-xs text-slate-400">{workshop.description || 'No description yet.'}</p>
-
-                  <div className="grid gap-1 text-xs text-slate-300">
-                    <div>Category: {workshop.category || 'Workshop'} | Level: {workshop.level || 'Beginner'}</div>
-                    <div>Language: {workshop.language || 'English'}</div>
-                    <div>Modules: {workshop.modules.length} | Videos: {totalVideosByWorkshop(workshop)}</div>
-                    <div>Instructor ID: {workshop.instructorId || workshop.instructor_id || '—'}</div>
-                  </div>
-
-                  <div className="flex items-center justify-between rounded-md border border-slate-800 bg-slate-900 px-2.5 py-2 text-xs text-slate-200">
-                    <span className="text-emerald-200">{formatInr(workshop.price || 0)}</span>
-                    <span className="text-slate-300">{workshop.enrolledStudents || 0} enrolled</span>
-                  </div>
-                </div>
-              </article>
-            )
-          })}
-        </div>
-
-        {!filteredWorkshops.length && (
-          <div className="mt-3 rounded-md border border-dashed border-[#2B2B30] px-3 py-8 text-center text-sm text-slate-400">
-            No workshops match your filter.
+    return (
+      <section className="space-y-4">
+        {snapshot.courseSync && !snapshot.courseSync.ok && (
+          <div className="rounded-xl border border-amber-700/70 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            Courses table sync is currently unavailable. Please ensure backend is running and reachable.
           </div>
         )}
-      </div>
-    </section>
-  )
+
+        <div className="p-0">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-sky-300">All Workshops</h2>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-2 rounded-md border border-[#2B2B30] px-3 py-2 text-sm text-slate-300">
+                <Search className="h-4 w-4 text-slate-500" />
+                <input
+                  type="text"
+                  value={workshopSearch}
+                  onChange={(event) => setWorkshopSearch(event.target.value)}
+                  placeholder="Search title, slug, category"
+                  className="w-52 bg-transparent outline-none"
+                />
+              </label>
+
+              <select
+                value={workshopStatusFilter}
+                onChange={(event) => setWorkshopStatusFilter(event.target.value)}
+                className="rounded-md border border-sky-700/40 bg-slate-900 px-3 py-2 text-sm text-slate-200 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+              >
+                <option value="all">All statuses</option>
+                <option value="published">Published</option>
+              </select>
+
+              <button
+                type="button"
+                onClick={() => {
+                  void loadSnapshot({ silent: true })
+                }}
+                className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white transition hover:bg-slate-700"
+              >
+                <RefreshCw className="h-4 w-4" /> Refresh
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSection(SECTION_IDS.CREATE_WORKSHOP)}
+                className="inline-flex items-center gap-2 rounded-md border border-sky-500/40 bg-sky-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-sky-500 shadow-sm shadow-sky-500/20"
+              >
+                <Plus className="h-4 w-4" /> Create Workshop
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {filteredWorkshops.map((workshop) => {
+              const thumbnailSource = workshop.thumbnailBlobUrl || workshop.thumbnailUrl || ''
+
+              return (
+                <article
+                  key={workshop.id}
+                  onClick={() => setSelectedWorkshopForBuilder(workshop)}
+                  className="overflow-hidden rounded-lg border border-slate-800 bg-slate-950 shadow-sm shadow-sky-500/5 cursor-pointer hover:border-sky-500/50 hover:shadow-sky-500/10 transition-all duration-200"
+                >
+                  {thumbnailSource ? (
+                    <img src={thumbnailSource} alt={workshop.title} className="h-36 w-full object-cover" />
+                  ) : (
+                    <div className="h-36 w-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950" />
+                  )}
+
+                  <div className="space-y-3 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h3 className="truncate text-sm font-semibold text-sky-100">{workshop.title}</h3>
+                        <div className="mt-1 truncate text-xs text-slate-400">/{workshop.slug || 'slug-not-set'}</div>
+                      </div>
+
+                      <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] text-sky-200">courses table</span>
+                    </div>
+
+                    <p className="line-clamp-3 text-xs text-slate-400">{workshop.description || 'No description yet.'}</p>
+
+                    <div className="grid gap-1 text-xs text-slate-300">
+                      <div>Category: {workshop.category || 'Workshop'} | Level: {workshop.level || 'Beginner'}</div>
+                      <div>Language: {workshop.language || 'English'}</div>
+                      <div>Modules: {workshop.modules.length} | Videos: {totalVideosByWorkshop(workshop)}</div>
+                      <div>Instructor ID: {workshop.instructorId || workshop.instructor_id || '—'}</div>
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-md border border-slate-800 bg-slate-900 px-2.5 py-2 text-xs text-slate-200">
+                      <span className="text-emerald-200">{formatInr(workshop.price || 0)}</span>
+                      <span className="text-slate-300">{workshop.enrolledStudents || 0} enrolled</span>
+                    </div>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+
+          {!filteredWorkshops.length && (
+            <div className="mt-3 rounded-md border border-dashed border-[#2B2B30] px-3 py-8 text-center text-sm text-slate-400">
+              No workshops match your filter.
+            </div>
+          )}
+        </div>
+      </section>
+    )
+  }
 
   const renderCreateWorkshop = () => (
     <section className="space-y-4">
@@ -1232,9 +1226,9 @@ const SuperAdminDashboard = () => {
       )}
 
       <div className="space-y-4">
-<div className="rounded-xl border border-sky-600/20 bg-slate-900 p-4 shadow-xl shadow-sky-500/10">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-sky-300">Create Workshop</h2>
+        <div className="rounded-xl border border-sky-600/20 bg-slate-900 p-4 shadow-xl shadow-sky-500/10">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-sky-300">Create Workshop</h2>
           </div>
 
           <form className="space-y-3" onSubmit={handleWorkshopSubmit}>
@@ -1545,11 +1539,10 @@ const SuperAdminDashboard = () => {
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={() => handleModuleDrop(index)}
                 onDragEnd={() => setDragModuleIndex(null)}
-                className={`rounded-md border px-3 py-2 transition ${
-                  selectedModuleId === module.id
+                className={`rounded-md border px-3 py-2 transition ${selectedModuleId === module.id
                     ? 'border-cyan-700 bg-cyan-700/10'
                     : 'border-slate-800 bg-slate-950 hover:border-slate-700'
-                }`}
+                  }`}
               >
                 <button
                   type="button"
@@ -1722,11 +1715,10 @@ const SuperAdminDashboard = () => {
 
                   <div className="flex items-center gap-2">
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs ${
-                        entry.status === 'granted'
+                      className={`rounded-full px-2 py-0.5 text-xs ${entry.status === 'granted'
                           ? 'bg-emerald-500/15 text-emerald-300'
                           : 'bg-rose-500/15 text-rose-300'
-                      }`}
+                        }`}
                     >
                       {entry.status}
                     </span>
@@ -1990,13 +1982,12 @@ const SuperAdminDashboard = () => {
                     </div>
 
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs ${
-                        job.status === 'completed'
+                      className={`rounded-full px-2 py-0.5 text-xs ${job.status === 'completed'
                           ? 'bg-emerald-500/15 text-emerald-300'
                           : job.status === 'failed'
-                          ? 'bg-rose-500/15 text-rose-300'
-                          : 'bg-amber-500/15 text-amber-300'
-                      }`}
+                            ? 'bg-rose-500/15 text-rose-300'
+                            : 'bg-amber-500/15 text-amber-300'
+                        }`}
                     >
                       {job.status}
                     </span>
@@ -2004,13 +1995,12 @@ const SuperAdminDashboard = () => {
 
                   <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[#1F1F23]">
                     <div
-                      className={`h-full transition-all ${
-                        job.status === 'completed'
+                      className={`h-full transition-all ${job.status === 'completed'
                           ? 'bg-emerald-500'
                           : job.status === 'failed'
-                          ? 'bg-rose-500'
-                          : 'bg-cyan-500'
-                      }`}
+                            ? 'bg-rose-500'
+                            : 'bg-cyan-500'
+                        }`}
                       style={{ width: `${Math.min(100, Math.max(0, Number(job.progress || 0)))}%` }}
                     />
                   </div>

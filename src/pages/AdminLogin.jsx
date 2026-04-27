@@ -5,7 +5,7 @@ import { setAuth } from '../utils/auth'
 import { buildApiUrl, parseJsonSafe } from '../utils/apiClient'
 import { useAuthState } from '../hooks/useAuth'
 
-const getRoleRedirect = (role) => (role === 'super_admin' ? '/admin/super-admin-dashboard' : '/admin/dashboard')
+const getRoleRedirect = (role) => '/admin/super-admin-dashboard'
 
 const AdminLogin = () => {
   const navigate = useNavigate()

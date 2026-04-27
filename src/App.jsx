@@ -9,7 +9,6 @@ import MyLearning from "./pages/MyLearning";
 import Learn from "./pages/Learn";
 import Profile from "./pages/Profile";
 import Search from "./pages/Search";
-import AdminDashboard from "./pages/admin/AdminDashboard";
 import SuperAdminDashboard from "./pages/admin/SuperAdminDashboard";
 import WorkshopBuilder from "./pages/admin/WorkshopBuilder";
 import AdminLogin from "./pages/AdminLogin";
@@ -24,8 +23,7 @@ const AdminEntryRedirect = () => {
     return <Navigate to="/admin/login" replace />
   }
 
-  const path = user.role === "super_admin" ? "/admin/super-admin-dashboard" : "/admin/dashboard"
-  return <Navigate to={path} replace />
+  return <Navigate to="/admin/super-admin-dashboard" replace />
 }
 
 function App() {
@@ -64,19 +62,12 @@ function App() {
       <Route path="/search" element={<Search />} />
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/admin" element={<AdminEntryRedirect />} />
-      <Route
-        path="/admin/dashboard"
-        element={
-          <ProtectedAdminRoute allowedRoles={["admin", "instructor"]}>
-            <AdminDashboard />
-          </ProtectedAdminRoute>
-        }
-      />
-      <Route path="/admin/instructor-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
+      <Route path="/admin/dashboard" element={<Navigate to="/admin/super-admin-dashboard" replace />} />
+      <Route path="/admin/instructor-dashboard" element={<Navigate to="/admin/super-admin-dashboard" replace />} />
       <Route
         path="/admin/super-admin-dashboard"
         element={
-          <ProtectedAdminRoute allowedRoles={["super_admin"]}>
+          <ProtectedAdminRoute allowedRoles={["super_admin", "admin", "instructor"]}>
             <SuperAdminDashboard />
           </ProtectedAdminRoute>
         }
