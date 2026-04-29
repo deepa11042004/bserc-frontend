@@ -27,50 +27,52 @@ export default function LessonItem({ lesson, moduleId, onEdit, onDelete }) {
     <div
       ref={setNodeRef}
       style={style}
-      className={`group flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg border ${
-        isDragging ? 'border-indigo-300 ring-1 ring-indigo-200' : 'border-gray-200'
+      className={`flex items-center justify-between rounded-lg border p-3 transition-colors duration-200 ${
+        isDragging
+          ? 'border-cyan-500/60 ring-1 ring-cyan-500/30 bg-[#1A1A1F]'
+          : 'border-[#1F1F23] bg-[#0F0F12] hover:bg-[#1A1A1F]'
       } transition-colors duration-200`}
     >
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <div
           {...attributes}
           {...listeners}
-          className="p-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing rounded"
+          className="cursor-grab rounded p-1 text-slate-500 hover:text-slate-300 active:cursor-grabbing"
         >
           <GripVertical className="h-4 w-4" />
         </div>
         
-        <div className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-white border border-gray-200 text-indigo-500">
+        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-[#2B2B30] bg-[#111115] text-sky-300">
           <Video className="h-4 w-4" />
         </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h4 className="text-sm font-medium text-gray-900 truncate">{lesson.title}</h4>
+            <h4 className="truncate text-sm font-medium text-slate-100">{lesson.title}</h4>
             {lesson.isPreview && (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700">
+              <span className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300">
                 <Eye className="h-3 w-3" />
                 Free
               </span>
             )}
           </div>
           {lesson.description && (
-            <p className="text-xs text-gray-500 truncate mt-0.5">{lesson.description}</p>
+            <p className="mt-0.5 truncate text-xs text-slate-400">{lesson.description}</p>
           )}
         </div>
       </div>
 
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-4 flex-shrink-0">
+      <div className="ml-4 flex flex-shrink-0 items-center gap-1">
         <button
           onClick={() => onEdit?.()}
-          className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+          className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-sky-500/10 hover:text-sky-300"
           title="Edit Lesson"
         >
           <Edit2 className="h-3.5 w-3.5" />
         </button>
         <button
           onClick={() => onDelete?.()}
-          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+          className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-rose-500/10 hover:text-rose-300"
           title="Delete Lesson"
         >
           <Trash2 className="h-3.5 w-3.5" />

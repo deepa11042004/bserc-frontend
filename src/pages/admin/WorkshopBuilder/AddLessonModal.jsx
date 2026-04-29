@@ -30,15 +30,15 @@ export default function AddLessonModal({ isOpen, onClose, onSave, initialData })
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md overflow-hidden rounded-xl border border-[#2B2B30] bg-[#111115] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[#1F1F23] px-6 py-4">
+          <h2 className="text-lg font-semibold text-white">
             {initialData ? 'Edit Lesson' : 'Add New Lesson'}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-slate-400 transition-colors hover:text-white"
           >
             <X className="h-5 w-5" />
           </button>
@@ -47,7 +47,7 @@ export default function AddLessonModal({ isOpen, onClose, onSave, initialData })
         <form onSubmit={handleSubmit} className="p-6">
           <div className="space-y-4">
             <div>
-              <label htmlFor="lessonTitle" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="lessonTitle" className="mb-1 block text-sm font-medium text-slate-300">
                 Lesson Title <span className="text-red-500">*</span>
               </label>
               <input
@@ -55,26 +55,26 @@ export default function AddLessonModal({ isOpen, onClose, onSave, initialData })
                 id="lessonTitle"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow"
+                className="w-full rounded-lg border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none transition-shadow focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
                 placeholder="e.g. Setting up your environment"
                 required
               />
             </div>
             
             <div>
-              <label htmlFor="videoUrl" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="videoUrl" className="mb-1 block text-sm font-medium text-slate-300">
                 YouTube Video URL <span className="text-red-500">*</span>
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Youtube className="h-4 w-4 text-gray-400" />
+                  <Youtube className="h-4 w-4 text-slate-500" />
                 </div>
                 <input
                   type="url"
                   id="videoUrl"
                   value={videoUrl}
                   onChange={(e) => setVideoUrl(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow"
+                  className="w-full rounded-lg border border-[#2B2B30] bg-[#0F0F12] py-2 pl-9 pr-3 text-sm text-white outline-none transition-shadow focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
                   placeholder="https://youtube.com/watch?v=..."
                   required
                 />
@@ -82,15 +82,15 @@ export default function AddLessonModal({ isOpen, onClose, onSave, initialData })
             </div>
 
             <div>
-              <label htmlFor="lessonDesc" className="block text-sm font-medium text-gray-700 mb-1">
-                Description <span className="text-gray-400 font-normal">(Optional)</span>
+              <label htmlFor="lessonDesc" className="mb-1 block text-sm font-medium text-slate-300">
+                Description <span className="font-normal text-slate-500">(Optional)</span>
               </label>
               <textarea
                 id="lessonDesc"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow resize-none"
+                className="w-full resize-none rounded-lg border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none transition-shadow focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
                 placeholder="Brief summary of this lesson..."
               />
             </div>
@@ -101,9 +101,9 @@ export default function AddLessonModal({ isOpen, onClose, onSave, initialData })
                 type="checkbox"
                 checked={isPreview}
                 onChange={(e) => setIsPreview(e.target.checked)}
-                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                className="h-4 w-4 rounded border-[#2B2B30] bg-[#0F0F12] text-sky-500 focus:ring-sky-500"
               />
-              <label htmlFor="isPreview" className="ml-2 block text-sm text-gray-900">
+              <label htmlFor="isPreview" className="ml-2 block text-sm text-slate-200">
                 Free Preview (Visible to non-enrolled users)
               </label>
             </div>
@@ -113,14 +113,14 @@ export default function AddLessonModal({ isOpen, onClose, onSave, initialData })
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+              className="rounded-lg border border-[#2B2B30] bg-[#0F0F12] px-4 py-2 text-sm font-medium text-slate-200 transition-colors hover:bg-[#1A1A1F]"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!title.trim() || !videoUrl.trim()}
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {initialData ? 'Save Changes' : 'Add Lesson'}
             </button>

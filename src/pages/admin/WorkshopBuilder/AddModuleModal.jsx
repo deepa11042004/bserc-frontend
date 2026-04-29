@@ -24,15 +24,15 @@ export default function AddModuleModal({ isOpen, onClose, onSave, initialData })
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md overflow-hidden rounded-xl border border-[#2B2B30] bg-[#111115] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[#1F1F23] px-6 py-4">
+          <h2 className="text-lg font-semibold text-white">
             {initialData ? 'Edit Module' : 'Add New Module'}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-slate-400 transition-colors hover:text-white"
           >
             <X className="h-5 w-5" />
           </button>
@@ -41,7 +41,7 @@ export default function AddModuleModal({ isOpen, onClose, onSave, initialData })
         <form onSubmit={handleSubmit} className="p-6">
           <div className="space-y-4">
             <div>
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="title" className="mb-1 block text-sm font-medium text-slate-300">
                 Module Title <span className="text-red-500">*</span>
               </label>
               <input
@@ -49,22 +49,22 @@ export default function AddModuleModal({ isOpen, onClose, onSave, initialData })
                 id="title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow"
+                className="w-full rounded-lg border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none transition-shadow focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
                 placeholder="e.g. Introduction to React"
                 required
               />
             </div>
             
             <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                Description <span className="text-gray-400 font-normal">(Optional)</span>
+              <label htmlFor="description" className="mb-1 block text-sm font-medium text-slate-300">
+                Description <span className="font-normal text-slate-500">(Optional)</span>
               </label>
               <textarea
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow resize-none"
+                className="w-full resize-none rounded-lg border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none transition-shadow focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
                 placeholder="Briefly describe what this module covers..."
               />
             </div>
@@ -74,14 +74,14 @@ export default function AddModuleModal({ isOpen, onClose, onSave, initialData })
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+              className="rounded-lg border border-[#2B2B30] bg-[#0F0F12] px-4 py-2 text-sm font-medium text-slate-200 transition-colors hover:bg-[#1A1A1F]"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!title.trim()}
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {initialData ? 'Save Changes' : 'Create Module'}
             </button>

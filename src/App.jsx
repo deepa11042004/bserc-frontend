@@ -80,6 +80,14 @@ function App() {
           </ProtectedAdminRoute>
         }
       />
+      <Route
+        path="/superadmin/courses/:id/builder"
+        element={
+          <ProtectedAdminRoute allowedRoles={["super_admin"]}>
+            <WorkshopBuilder />
+          </ProtectedAdminRoute>
+        }
+      />
     </Routes>
   );
 }

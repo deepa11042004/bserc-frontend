@@ -28,7 +28,7 @@ import SuperAdminMetricCard from '../../components/superAdmin/SuperAdminMetricCa
 import { lmsAdminService } from '../../services/lmsAdminService'
 import { useAuthState } from '../../hooks/useAuth'
 import { logoutAdmin } from '../../utils/auth'
-import WorkshopContentPage from './WorkshopContentPage'
+import WorkshopBuilder from './WorkshopBuilder'
 
 const SECTION_IDS = {
   OVERVIEW: 'overview',
@@ -68,7 +68,7 @@ const INITIAL_WORKSHOP_FORM = {
   slug: '',
   subtitle: '',
   description: '',
-  category: 'Workshop',
+  category: 'Course',
   level: 'Beginner',
   language: 'English',
   price: '',
@@ -370,7 +370,7 @@ const SuperAdminDashboard = () => {
         items: [
           {
             id: SECTION_IDS.ALL_WORKSHOPS,
-            label: 'All Workshops',
+            label: 'All Courses',
             icon: BookOpenCheck,
             badge: snapshot.workshops.length,
           },
@@ -435,7 +435,7 @@ const SuperAdminDashboard = () => {
           },
           {
             id: SECTION_IDS.WORKSHOP_PERFORMANCE,
-            label: 'Workshop Performance',
+            label: 'Course Performance',
             icon: BarChart3,
           },
           {
@@ -586,10 +586,10 @@ const SuperAdminDashboard = () => {
   )
 
   const sourceWorkshopLabel = useMemo(() => {
-    if (!accessWorkshop?.originalWorkshopId) return 'No source workshop linked'
+    if (!accessWorkshop?.originalWorkshopId) return 'No source course linked'
 
     const source = snapshot.liveWorkshops.find((workshop) => String(workshop.id) === String(accessWorkshop.originalWorkshopId))
-    return source ? source.title : `Source workshop #${accessWorkshop.originalWorkshopId}`
+    return source ? source.title : `Source course #${accessWorkshop.originalWorkshopId}`
   }, [accessWorkshop, snapshot.liveWorkshops])
 
   const handleLogout = () => logoutAdmin(navigate)
@@ -677,13 +677,14 @@ const SuperAdminDashboard = () => {
       }
 
       await lmsAdminService.createWorkshop(payload)
-      setFlash('Workshop created in courses table successfully.')
+      setFlash('Course created in courses table successfully.')
 
       clearWorkshopForm()
       await loadSnapshot({ silent: true })
+      setActiveSection(SECTION_IDS.ALL_WORKSHOPS)
     } catch (err) {
       console.error(err)
-      setError(err?.message || 'Could not save workshop.')
+      setError(err?.message || 'Could not save course.')
     } finally {
       setBusy(false)
     }
@@ -824,7 +825,7 @@ const SuperAdminDashboard = () => {
 
       if (!result.ok) {
         setSourceParticipants([])
-        setError(result.message || 'Could not fetch participants from source workshop.')
+        setError(result.message || 'Could not fetch participants from source course.')
         return
       }
 
@@ -907,7 +908,7 @@ const SuperAdminDashboard = () => {
   const handleUploadSubmit = async (event) => {
     event.preventDefault()
     if (!uploadForm.workshopId || !uploadForm.moduleId || !uploadForm.videoFiles.length) {
-      setError('Choose workshop, module, and at least one video file.')
+      setError('Choose course, module, and at least one video file.')
       return
     }
 
@@ -1011,9 +1012,9 @@ const SuperAdminDashboard = () => {
     <section className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SuperAdminMetricCard
-          label="Total Workshops"
+          label="Total Courses"
           value={snapshot.metrics.totalWorkshops}
-          helper="Recorded workshops in LMS"
+          helper="Recorded courses in LMS"
         />
         <SuperAdminMetricCard
           label="Total Videos"
@@ -1103,10 +1104,35 @@ const SuperAdminDashboard = () => {
   const renderAllWorkshops = () => {
     if (selectedWorkshopForBuilder) {
       return (
-        <WorkshopContentPage
-          workshop={selectedWorkshopForBuilder}
-          onBack={() => setSelectedWorkshopForBuilder(null)}
-        />
+        <section className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setSelectedWorkshopForBuilder(null)}
+              className="inline-flex items-center rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 transition hover:bg-slate-800"
+            >
+              Back to All Courses
+            </button>
+          </div>
+
+          <WorkshopBuilder
+            course={selectedWorkshopForBuilder}
+            onPublished={(publishedCourse) => {
+              setSelectedWorkshopForBuilder((current) => {
+                if (!current) return current
+
+                return {
+                  ...current,
+                  ...publishedCourse,
+                  status: 'published',
+                  isPublished: true,
+                }
+              })
+
+              void loadSnapshot({ silent: true })
+            }}
+          />
+        </section>
       )
     }
 
@@ -1120,7 +1146,7 @@ const SuperAdminDashboard = () => {
 
         <div className="p-0">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-sky-300">All Workshops</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-sky-300">All Courses</h2>
 
             <div className="flex flex-wrap items-center gap-2">
               <label className="flex items-center gap-2 rounded-md border border-[#2B2B30] px-3 py-2 text-sm text-slate-300">
@@ -1141,6 +1167,7 @@ const SuperAdminDashboard = () => {
               >
                 <option value="all">All statuses</option>
                 <option value="published">Published</option>
+                <option value="draft">Draft</option>
               </select>
 
               <button
@@ -1157,7 +1184,7 @@ const SuperAdminDashboard = () => {
                 onClick={() => setActiveSection(SECTION_IDS.CREATE_WORKSHOP)}
                 className="inline-flex items-center gap-2 rounded-md border border-sky-500/40 bg-sky-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-sky-500 shadow-sm shadow-sky-500/20"
               >
-                <Plus className="h-4 w-4" /> Create Workshop
+                <Plus className="h-4 w-4" /> Create Course
               </button>
             </div>
           </div>
@@ -1185,13 +1212,23 @@ const SuperAdminDashboard = () => {
                         <div className="mt-1 truncate text-xs text-slate-400">/{workshop.slug || 'slug-not-set'}</div>
                       </div>
 
-                      <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] text-sky-200">courses table</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] text-sky-200">courses table</span>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] ${workshop.status === 'published'
+                            ? 'bg-emerald-500/15 text-emerald-200'
+                            : 'bg-amber-500/15 text-amber-200'
+                            }`}
+                        >
+                          {workshop.status === 'published' ? 'Published' : 'Draft'}
+                        </span>
+                      </div>
                     </div>
 
                     <p className="line-clamp-3 text-xs text-slate-400">{workshop.description || 'No description yet.'}</p>
 
                     <div className="grid gap-1 text-xs text-slate-300">
-                      <div>Category: {workshop.category || 'Workshop'} | Level: {workshop.level || 'Beginner'}</div>
+                      <div>Category: {workshop.category || 'Course'} | Level: {workshop.level || 'Beginner'}</div>
                       <div>Language: {workshop.language || 'English'}</div>
                       <div>Modules: {workshop.modules.length} | Videos: {totalVideosByWorkshop(workshop)}</div>
                       <div>Instructor ID: {workshop.instructorId || workshop.instructor_id || '—'}</div>
@@ -1209,7 +1246,7 @@ const SuperAdminDashboard = () => {
 
           {!filteredWorkshops.length && (
             <div className="mt-3 rounded-md border border-dashed border-[#2B2B30] px-3 py-8 text-center text-sm text-slate-400">
-              No workshops match your filter.
+              No courses match your filter.
             </div>
           )}
         </div>
@@ -1228,12 +1265,12 @@ const SuperAdminDashboard = () => {
       <div className="space-y-4">
         <div className="rounded-xl border border-sky-600/20 bg-slate-900 p-4 shadow-xl shadow-sky-500/10">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-sky-300">Create Workshop</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-sky-300">Create Course</h2>
           </div>
 
           <form className="space-y-3" onSubmit={handleWorkshopSubmit}>
             <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
-              Workshop title
+              Course title
               <input
                 type="text"
                 value={workshopForm.title}
@@ -1278,7 +1315,7 @@ const SuperAdminDashboard = () => {
                 value={workshopForm.description}
                 onChange={(event) => setWorkshopForm((prev) => ({ ...prev, description: event.target.value }))}
                 rows={3}
-                placeholder="What this workshop recording covers"
+                placeholder="What this course recording covers"
                 className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
               />
             </label>
@@ -1290,7 +1327,7 @@ const SuperAdminDashboard = () => {
                   type="text"
                   value={workshopForm.category}
                   onChange={(event) => setWorkshopForm((prev) => ({ ...prev, category: event.target.value }))}
-                  placeholder="Workshop"
+                  placeholder="Course"
                   className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
                 />
               </label>
@@ -1436,7 +1473,7 @@ const SuperAdminDashboard = () => {
             {workshopThumbPreview && (
               <img
                 src={workshopThumbPreview}
-                alt="Workshop thumbnail preview"
+                alt="Course thumbnail preview"
                 className="h-32 w-full rounded-md border border-[#1F1F23] object-cover"
               />
             )}
@@ -1446,7 +1483,7 @@ const SuperAdminDashboard = () => {
               disabled={busy}
               className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:opacity-70"
             >
-              Create workshop in courses table
+              Create course in courses table
             </button>
           </form>
         </div>
@@ -1455,15 +1492,15 @@ const SuperAdminDashboard = () => {
           <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-300">Live Preview</h3>
 
           <div className="mt-3 rounded-md border border-slate-800 bg-slate-900 p-3">
-            <div className="text-sm font-semibold text-white">{workshopForm.title || 'Workshop title preview'}</div>
+            <div className="text-sm font-semibold text-white">{workshopForm.title || 'Course title preview'}</div>
             <div className="mt-1 text-xs text-slate-400">/{workshopForm.slug || 'auto-generated-slug'}</div>
             <p className="mt-2 line-clamp-3 text-xs text-slate-400">
-              {workshopForm.description || 'Your workshop summary will appear here.'}
+              {workshopForm.description || 'Your course summary will appear here.'}
             </p>
 
             <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
               <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-sky-200">
-                {workshopForm.category || 'Workshop'}
+                {workshopForm.category || 'Course'}
               </span>
               <span className="rounded-full bg-slate-700/20 px-2 py-0.5 text-slate-200">
                 {workshopForm.level || 'Beginner'}
@@ -1575,7 +1612,7 @@ const SuperAdminDashboard = () => {
 
           {!selectedModuleWorkshop?.modules.length && (
             <div className="rounded-md border border-dashed border-[#2B2B30] px-3 py-6 text-center text-sm text-slate-400">
-              No modules yet for this workshop.
+              No modules yet for this course.
             </div>
           )}
         </div>
@@ -1692,7 +1729,7 @@ const SuperAdminDashboard = () => {
               className="inline-flex items-center gap-2 rounded-md border border-[#2B2B30] px-3 py-2 text-sm text-slate-100 transition hover:bg-[#1A1A1F] disabled:opacity-50"
             >
               <RefreshCw className="h-4 w-4" />
-              Sync from source workshop
+              Sync from source course
             </button>
           </div>
         </div>
@@ -1737,7 +1774,7 @@ const SuperAdminDashboard = () => {
 
             {!accessRows.length && (
               <div className="rounded-md border border-dashed border-[#2B2B30] px-3 py-8 text-center text-sm text-slate-400">
-                No access records yet for this workshop.
+                No access records yet for this course.
               </div>
             )}
           </div>
@@ -1824,7 +1861,7 @@ const SuperAdminDashboard = () => {
           <form className="space-y-3" onSubmit={handleUploadSubmit}>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-xs uppercase tracking-[0.14em] text-slate-400">
-                Workshop
+                Course
                 <select
                   value={uploadForm.workshopId}
                   onChange={(event) => {
@@ -2075,7 +2112,7 @@ const SuperAdminDashboard = () => {
 
         <div className="grid gap-4 xl:grid-cols-2">
           <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
-            <h2 className="mb-4 text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Views per Workshop</h2>
+            <h2 className="mb-4 text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Views per Course</h2>
 
             <div className="space-y-3">
               {workshopViews.map((entry) => (
@@ -2127,7 +2164,7 @@ const SuperAdminDashboard = () => {
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Announcements</h2>
-          <p className="text-sm text-slate-400">Create and publish announcements for students, workshop attendees, and staff.</p>
+          <p className="text-sm text-slate-400">Create and publish announcements for students, course attendees, and staff.</p>
           <button className="mt-4 inline-flex items-center gap-2 rounded-md border border-[#2B2B30] px-3 py-2 text-sm text-slate-100 transition hover:bg-[#1A1A1F]">
             <Megaphone className="h-4 w-4" /> Create announcement
           </button>
@@ -2157,7 +2194,7 @@ const SuperAdminDashboard = () => {
 
         <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">FAQ Management</h2>
-          <p className="text-sm text-slate-400">Maintain student-facing FAQs for the LMS and workshop platform.</p>
+          <p className="text-sm text-slate-400">Maintain student-facing FAQs for the LMS and course platform.</p>
           <button className="mt-4 inline-flex items-center gap-2 rounded-md border border-[#2B2B30] px-3 py-2 text-sm text-slate-100 transition hover:bg-[#1A1A1F]">
             <HelpCircle className="h-4 w-4" /> Edit FAQs
           </button>
@@ -2386,7 +2423,7 @@ const SuperAdminDashboard = () => {
         <div className="flex min-h-screen flex-1 flex-col lg:pl-72">
           <SuperAdminTopbar
             title={activeSectionMeta?.label || 'Super Admin Dashboard'}
-            subtitle="Recorded workshops LMS control panel"
+            subtitle="Recorded courses LMS control panel"
             onMenuClick={() => setIsSidebarOpen(true)}
             notifications={snapshot.uploadJobs.filter((job) => job.status === 'uploading' || job.status === 'queued').length}
             userName={user?.name || user?.email || 'Super Admin'}
@@ -2407,7 +2444,7 @@ const SuperAdminDashboard = () => {
             )}
 
             {/* <div className="rounded-xl border border-[#1F1F23] bg-[#111115] px-4 py-3 text-xs text-slate-400">
-              Controls include workshop CRUD, module/video structure, enrollment-based access, upload queue, analytics,
+              Controls include course CRUD, module/video structure, enrollment-based access, upload queue, analytics,
               and storage/permission settings.
             </div> */}
 
@@ -2420,3 +2457,4 @@ const SuperAdminDashboard = () => {
 }
 
 export default SuperAdminDashboard
+

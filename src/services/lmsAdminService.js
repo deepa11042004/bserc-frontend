@@ -330,12 +330,314 @@ const tryFetchJson = async (path, init = undefined) => {
   }
 }
 
+const toApiId = (value) => {
+  const parsed = toInt(value)
+  if (Number.isInteger(parsed) && parsed > 0) return parsed
+
+  const text = normalizeText(value)
+  const match = text.match(/(\d+)/)
+  if (!match) return null
+
+  const extracted = toInt(match[1])
+  return Number.isInteger(extracted) && extracted > 0 ? extracted : null
+}
+
+const toApiCourseId = (value) => {
+  if (value && typeof value === 'object') {
+    const byApiField = toApiId(value.apiCourseId)
+    if (byApiField) return byApiField
+
+    return toApiId(value.id)
+  }
+
+  return toApiId(value)
+}
+
+const getBuilderAuthToken = () => {
+  const token = getToken()
+  if (!token) {
+    throw new Error('Authentication token missing. Please login again.')
+  }
+
+  return token
+}
+
+const getApiErrorMessage = (response, fallback) => {
+  const statusLabel = response?.status ? ` (HTTP ${response.status})` : ''
+  return `${response?.payload?.message || fallback}${statusLabel}`
+}
+
+const normalizeBuilderLesson = (lesson = {}) => ({
+  id: toApiId(lesson.id) || lesson.id,
+  moduleId: toApiId(lesson.module_id || lesson.moduleId),
+  title: normalizeText(lesson.title),
+  videoUrl: normalizeText(lesson.youtube_url || lesson.youtubeUrl || lesson.videoUrl),
+  description: normalizeText(lesson.description),
+  isPreview: Boolean(lesson.is_free_preview ?? lesson.isPreview ?? false),
+  durationSeconds: Number.isFinite(Number(lesson.duration_seconds ?? lesson.durationSeconds))
+    ? Number(lesson.duration_seconds ?? lesson.durationSeconds)
+    : 0,
+  orderIndex: Number.isFinite(Number(lesson.order_index ?? lesson.orderIndex))
+    ? Number(lesson.order_index ?? lesson.orderIndex)
+    : 0,
+})
+
+const normalizeBuilderModule = (module = {}) => ({
+  id: toApiId(module.id) || module.id,
+  courseId: toApiId(module.course_id || module.courseId),
+  title: normalizeText(module.title),
+  description: normalizeText(module.description),
+  orderIndex: Number.isFinite(Number(module.order_index ?? module.orderIndex))
+    ? Number(module.order_index ?? module.orderIndex)
+    : 0,
+  lessons: ensureArray(module.lessons).map(normalizeBuilderLesson),
+})
+
+const getCourseBuilderModules = async (courseIdInput) => {
+  const courseId = toApiCourseId(courseIdInput)
+  if (!courseId) {
+    throw new Error('Valid course id is required to load modules.')
+  }
+
+  const response = await tryFetchJson(`/api/courses/${courseId}/modules`)
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(response, 'Could not load modules for this course.'))
+  }
+
+  return asArray(response.payload, ['modules', 'data', 'results']).map(normalizeBuilderModule)
+}
+
+const createCourseBuilderModule = async (courseIdInput, payload = {}) => {
+  const courseId = toApiCourseId(courseIdInput)
+  if (!courseId) {
+    throw new Error('Valid course id is required to create a module.')
+  }
+
+  const token = getBuilderAuthToken()
+  const response = await tryFetchJson(`/api/admin/courses/${courseId}/modules`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      title: normalizeText(payload.title),
+      description: normalizeNullableText(payload.description),
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(response, 'Could not create module.'))
+  }
+
+  return normalizeBuilderModule(response.payload?.module || {})
+}
+
+const updateCourseBuilderModule = async (moduleIdInput, payload = {}) => {
+  const moduleId = toApiId(moduleIdInput)
+  if (!moduleId) {
+    throw new Error('Valid module id is required.')
+  }
+
+  const token = getBuilderAuthToken()
+  const response = await tryFetchJson(`/api/admin/modules/${moduleId}`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      title: payload.title !== undefined ? normalizeText(payload.title) : undefined,
+      description: payload.description !== undefined ? normalizeNullableText(payload.description) : undefined,
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(response, 'Could not update module.'))
+  }
+
+  return normalizeBuilderModule(response.payload?.module || {})
+}
+
+const deleteCourseBuilderModule = async (moduleIdInput) => {
+  const moduleId = toApiId(moduleIdInput)
+  if (!moduleId) {
+    throw new Error('Valid module id is required.')
+  }
+
+  const token = getBuilderAuthToken()
+  const response = await tryFetchJson(`/api/admin/modules/${moduleId}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(response, 'Could not delete module.'))
+  }
+
+  return { success: true }
+}
+
+const createCourseBuilderLesson = async (moduleIdInput, payload = {}) => {
+  const moduleId = toApiId(moduleIdInput)
+  if (!moduleId) {
+    throw new Error('Valid module id is required to create a lesson.')
+  }
+
+  const token = getBuilderAuthToken()
+  const response = await tryFetchJson(`/api/admin/modules/${moduleId}/lessons`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      title: normalizeText(payload.title),
+      description: normalizeNullableText(payload.description),
+      youtube_url: normalizeText(payload.videoUrl || payload.youtube_url || payload.youtubeUrl),
+      is_free_preview: Boolean(payload.isPreview ?? payload.is_free_preview),
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(response, 'Could not create lesson.'))
+  }
+
+  return normalizeBuilderLesson(response.payload?.lesson || {})
+}
+
+const updateCourseBuilderLesson = async (lessonIdInput, payload = {}) => {
+  const lessonId = toApiId(lessonIdInput)
+  if (!lessonId) {
+    throw new Error('Valid lesson id is required.')
+  }
+
+  const token = getBuilderAuthToken()
+  const response = await tryFetchJson(`/api/admin/lessons/${lessonId}`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      title: payload.title !== undefined ? normalizeText(payload.title) : undefined,
+      description: payload.description !== undefined ? normalizeNullableText(payload.description) : undefined,
+      module_id: payload.module_id !== undefined ? toApiId(payload.module_id) : undefined,
+      order_index:
+        payload.order_index !== undefined
+          ? toApiId(payload.order_index)
+          : payload.orderIndex !== undefined
+          ? toApiId(payload.orderIndex)
+          : undefined,
+      duration_seconds:
+        payload.duration_seconds !== undefined
+          ? toApiId(payload.duration_seconds)
+          : payload.durationSeconds !== undefined
+          ? toApiId(payload.durationSeconds)
+          : undefined,
+      youtube_url:
+        payload.videoUrl !== undefined || payload.youtube_url !== undefined || payload.youtubeUrl !== undefined
+          ? normalizeText(payload.videoUrl || payload.youtube_url || payload.youtubeUrl)
+          : undefined,
+      is_free_preview:
+        payload.isPreview !== undefined || payload.is_free_preview !== undefined
+          ? Boolean(payload.isPreview ?? payload.is_free_preview)
+          : undefined,
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(response, 'Could not update lesson.'))
+  }
+
+  return normalizeBuilderLesson(response.payload?.lesson || {})
+}
+
+const deleteCourseBuilderLesson = async (lessonIdInput) => {
+  const lessonId = toApiId(lessonIdInput)
+  if (!lessonId) {
+    throw new Error('Valid lesson id is required.')
+  }
+
+  const token = getBuilderAuthToken()
+  const response = await tryFetchJson(`/api/admin/lessons/${lessonId}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(response, 'Could not delete lesson.'))
+  }
+
+  return { success: true }
+}
+
+const reorderCourseBuilderModules = async (courseIdInput, moduleIds = []) => {
+  const courseId = toApiCourseId(courseIdInput)
+  if (!courseId) {
+    throw new Error('Valid course id is required to reorder modules.')
+  }
+
+  const normalizedIds = ensureArray(moduleIds).map(toApiId).filter(Boolean)
+  if (!normalizedIds.length) {
+    return []
+  }
+
+  const token = getBuilderAuthToken()
+  const response = await tryFetchJson(`/api/admin/courses/${courseId}/modules/reorder`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ moduleIds: normalizedIds }),
+  })
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(response, 'Could not reorder modules.'))
+  }
+
+  return asArray(response.payload, ['modules', 'data', 'results']).map(normalizeBuilderModule)
+}
+
+const reorderCourseBuilderLessons = async (moduleIdInput, lessonIds = []) => {
+  const moduleId = toApiId(moduleIdInput)
+  if (!moduleId) {
+    throw new Error('Valid module id is required to reorder lessons.')
+  }
+
+  const normalizedIds = ensureArray(lessonIds).map(toApiId).filter(Boolean)
+  if (!normalizedIds.length) {
+    return []
+  }
+
+  const token = getBuilderAuthToken()
+  const response = await tryFetchJson(`/api/admin/modules/${moduleId}/lessons/reorder`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ lessonIds: normalizedIds }),
+  })
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(response, 'Could not reorder lessons.'))
+  }
+
+  return asArray(response.payload, ['lessons', 'data', 'results']).map(normalizeBuilderLesson)
+}
+
 const normalizeLiveWorkshop = (workshop) => {
   const id = toInt(workshop.id)
 
   return {
     id: Number.isInteger(id) ? id : workshop.id,
-    title: workshop.title || workshop.workshop_title || `Workshop ${workshop.id || '-'}`,
+    title: workshop.title || workshop.workshop_title || `Course ${workshop.id || '-'}`,
     workshop_date: workshop.workshop_date || null,
     mode: workshop.mode || null,
     total_enrollments: Number.isFinite(Number(workshop.total_enrollments)) ? Number(workshop.total_enrollments) : 0,
@@ -357,6 +659,10 @@ const normalizeCourseWorkshop = (course, previousWorkshop = null) => {
   if (!courseId || !title) return null
 
   const now = new Date().toISOString()
+  const isPublished = toBoolean(
+    course?.is_published ?? course?.isPublished,
+    previousWorkshop?.isPublished ?? previousWorkshop?.status === 'published',
+  )
 
   return {
     id: toCourseWorkshopId(courseId),
@@ -365,8 +671,9 @@ const normalizeCourseWorkshop = (course, previousWorkshop = null) => {
     title,
     subtitle: normalizeText(previousWorkshop?.subtitle || course?.subtitle || ''),
     description: normalizeText(previousWorkshop?.description || course?.description || ''),
-    status: 'published',
-    category: normalizeText(course?.category || previousWorkshop?.category || 'Workshop'),
+    status: isPublished ? 'published' : 'draft',
+    isPublished,
+    category: normalizeText(course?.category || previousWorkshop?.category || 'Course'),
     level: normalizeText(course?.level || previousWorkshop?.level || 'Beginner'),
     language: normalizeText(course?.language || previousWorkshop?.language || 'English'),
     price: Number.isFinite(Number(course?.price)) ? Number(course.price) : Number(previousWorkshop?.price || 0),
@@ -402,13 +709,25 @@ const normalizeCourseWorkshop = (course, previousWorkshop = null) => {
 }
 
 const syncCourseTableWorkshops = async (state) => {
-  const response = await tryFetchJson('/api/courses')
+  const token = getToken()
+
+  let response = token
+    ? await tryFetchJson('/api/admin/courses', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+    : { ok: false, payload: null, status: 0 }
+
+  if (!response.ok) {
+    response = await tryFetchJson('/api/courses')
+  }
 
   if (!response.ok) {
     return {
       ok: false,
       state,
-      message: response.payload?.message || 'Could not fetch workshops from courses table.',
+      message: response.payload?.message || 'Could not fetch courses from courses table.',
     }
   }
 
@@ -445,6 +764,33 @@ const syncCourseTableWorkshops = async (state) => {
   }
 }
 
+const publishCourseBuilderCourse = async (courseIdInput) => {
+  const courseId = toApiCourseId(courseIdInput)
+  if (!courseId) {
+    throw new Error('Valid course id is required to publish.')
+  }
+
+  const token = getBuilderAuthToken()
+  const response = await tryFetchJson(`/api/admin/courses/${courseId}/publish`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(response, 'Could not publish course.'))
+  }
+
+  return normalizeCourseWorkshop(
+    response.payload?.course || {
+      id: courseId,
+      title: `Course ${courseId}`,
+      is_published: 1,
+    },
+  )
+}
+
 const getLiveWorkshops = async () => {
   const response = await tryFetchJson('/api/workshop-list/list')
   if (!response.ok) return []
@@ -459,7 +805,7 @@ const getSourceParticipants = async (sourceWorkshopId) => {
     return {
       ok: false,
       participants: [],
-      message: 'Could not fetch participants from live workshop API.',
+      message: 'Could not fetch participants from live course API.',
     }
   }
 
@@ -508,7 +854,7 @@ const createWorkshop = async (payload) => {
 
   const requestPayload = buildCreateCoursePayload(payload)
   if (!requestPayload.title) {
-    throw new Error('Workshop title is required.')
+    throw new Error('Course title is required.')
   }
 
   const formData = buildCreateCourseFormData(requestPayload, payload.thumbnailFile || null)
@@ -539,7 +885,7 @@ const createWorkshop = async (payload) => {
     }
 
     const statusLabel = createResponse.status ? ` (HTTP ${createResponse.status})` : ''
-    throw new Error((createResponse.payload?.message || 'Could not create workshop in courses table.') + statusLabel)
+    throw new Error((createResponse.payload?.message || 'Could not create course in courses table.') + statusLabel)
   }
 
   const createdCourse = createResponse.payload?.course || {}
@@ -561,8 +907,9 @@ const createWorkshop = async (payload) => {
     title: normalizeText(createdCourse.title || requestPayload.title),
     subtitle: normalizeText(createdCourse.subtitle || requestPayload.subtitle || ''),
     description: normalizeText(createdCourse.description || requestPayload.description || ''),
-    status: 'published',
-    category: normalizeText(createdCourse.category || requestPayload.category || 'Workshop'),
+    status: toBoolean(createdCourse.is_published ?? createdCourse.isPublished, false) ? 'published' : 'draft',
+    isPublished: toBoolean(createdCourse.is_published ?? createdCourse.isPublished, false),
+    category: normalizeText(createdCourse.category || requestPayload.category || 'Course'),
     level: normalizeText(createdCourse.level || requestPayload.level || 'Beginner'),
     language: normalizeText(createdCourse.language || requestPayload.language || 'English'),
     price: Number.isFinite(Number(createdCourse.price ?? requestPayload.price))
@@ -598,7 +945,7 @@ const createWorkshop = async (payload) => {
       workshops: [workshop, ...state.workshops.filter((entry) => entry.id !== workshop.id)],
     },
     {
-      action: 'Created workshop in courses table',
+      action: 'Created course in courses table',
       target: workshop.title,
     },
   )
@@ -619,11 +966,11 @@ const updateWorkshop = async (workshopId, payload) => {
   const state = readState()
   const current = state.workshops.find((workshop) => workshop.id === workshopId)
   if (!current) {
-    throw new Error('Workshop not found.')
+    throw new Error('Course not found.')
   }
 
   if (current.isManagedByApi) {
-    throw new Error('Editing synced course workshops is not available yet.')
+    throw new Error('Editing synced courses is not available yet.')
   }
 
   const updated = {
@@ -657,7 +1004,7 @@ const updateWorkshop = async (workshopId, payload) => {
   }
 
   if (!updated.title) {
-    throw new Error('Workshop title is required.')
+    throw new Error('Course title is required.')
   }
 
   const next = withActivity(
@@ -666,7 +1013,7 @@ const updateWorkshop = async (workshopId, payload) => {
       workshops: state.workshops.map((workshop) => (workshop.id === workshopId ? updated : workshop)),
     },
     {
-      action: 'Updated workshop details',
+      action: 'Updated course details',
       target: updated.title,
     },
   )
@@ -683,7 +1030,7 @@ const deleteWorkshop = async (workshopId) => {
   if (!deleting) return { success: true }
 
   if (deleting.isManagedByApi) {
-    throw new Error('Deleting synced course workshops is not available yet.')
+    throw new Error('Deleting synced courses is not available yet.')
   }
 
   const next = withActivity(
@@ -694,7 +1041,7 @@ const deleteWorkshop = async (workshopId) => {
       uploadJobs: state.uploadJobs.filter((job) => job.workshopId !== workshopId),
     },
     {
-      action: 'Deleted recorded workshop',
+      action: 'Deleted recorded course',
       target: deleting.title,
     },
   )
@@ -711,7 +1058,7 @@ const addModule = async (workshopId, title) => {
   if (!trimmedTitle) throw new Error('Module title is required.')
 
   const workshop = state.workshops.find((item) => item.id === workshopId)
-  if (!workshop) throw new Error('Workshop not found.')
+  if (!workshop) throw new Error('Course not found.')
 
   const module = {
     id: makeId('mod'),
@@ -727,7 +1074,7 @@ const addModule = async (workshopId, title) => {
       updatedAt: new Date().toISOString(),
     })),
     {
-      action: 'Added workshop module',
+      action: 'Added course module',
       target: `${workshop.title} / ${module.title}`,
     },
   )
@@ -741,7 +1088,7 @@ const updateModule = async (workshopId, moduleId, payload) => {
 
   const state = readState()
   const workshop = state.workshops.find((item) => item.id === workshopId)
-  if (!workshop) throw new Error('Workshop not found.')
+  if (!workshop) throw new Error('Course not found.')
 
   const moduleIndex = getModuleIndex(workshop, moduleId)
   if (moduleIndex < 0) throw new Error('Module not found.')
@@ -779,7 +1126,7 @@ const deleteModule = async (workshopId, moduleId) => {
 
   const state = readState()
   const workshop = state.workshops.find((item) => item.id === workshopId)
-  if (!workshop) throw new Error('Workshop not found.')
+  if (!workshop) throw new Error('Course not found.')
 
   const module = workshop.modules.find((item) => item.id === moduleId)
   if (!module) return { success: true }
@@ -828,7 +1175,7 @@ const addVideo = async (workshopId, moduleId, payload) => {
 
   const state = readState()
   const workshop = state.workshops.find((item) => item.id === workshopId)
-  if (!workshop) throw new Error('Workshop not found.')
+  if (!workshop) throw new Error('Course not found.')
 
   const moduleIndex = getModuleIndex(workshop, moduleId)
   if (moduleIndex < 0) throw new Error('Module not found.')
@@ -928,7 +1275,7 @@ const deleteVideo = async (workshopId, moduleId, videoId) => {
 
   const state = readState()
   const workshop = state.workshops.find((item) => item.id === workshopId)
-  if (!workshop) throw new Error('Workshop not found.')
+  if (!workshop) throw new Error('Course not found.')
 
   const module = workshop.modules.find((item) => item.id === moduleId)
   if (!module) throw new Error('Module not found.')
@@ -1066,7 +1413,7 @@ const grantAccess = async (payload) => {
     updatedAt: now,
   }
 
-  if (!entry.workshopId) throw new Error('Workshop id is required for access control.')
+  if (!entry.workshopId) throw new Error('Course id is required for access control.')
   if (!entry.email) throw new Error('Email is required for access control.')
 
   const upserted = upsertAccessEntries(state.accessEntries, [entry])
@@ -1077,7 +1424,7 @@ const grantAccess = async (payload) => {
       accessEntries: upserted,
     },
     {
-      action: 'Granted workshop access',
+      action: 'Granted course access',
       target: entry.email,
     },
   )
@@ -1106,7 +1453,7 @@ const setAccessStatus = async (entryId, status) => {
     },
     target
       ? {
-          action: normalizedStatus === 'granted' ? 'Restored workshop access' : 'Revoked workshop access',
+          action: normalizedStatus === 'granted' ? 'Restored course access' : 'Revoked course access',
           target: target.email || target.userId,
         }
       : null,
@@ -1121,17 +1468,17 @@ const syncAccessFromSource = async (workshopId) => {
   const workshop = state.workshops.find((entry) => entry.id === workshopId)
 
   if (!workshop) {
-    throw new Error('Workshop not found.')
+    throw new Error('Course not found.')
   }
 
   if (!workshop.originalWorkshopId) {
-    throw new Error('This recorded workshop is not linked with a source workshop.')
+    throw new Error('This recorded course is not linked with a source course.')
   }
 
   const result = await getSourceParticipants(workshop.originalWorkshopId)
 
   if (!result.ok) {
-    throw new Error(result.message || 'Could not fetch participants from source workshop.')
+    throw new Error(result.message || 'Could not fetch participants from source course.')
   }
 
   const records = result.participants.map((participant) => ({
@@ -1225,6 +1572,16 @@ export const lmsAdminService = {
   getDashboardSnapshot,
   getLiveWorkshops,
   getSourceParticipants,
+  getCourseBuilderModules,
+  createCourseBuilderModule,
+  updateCourseBuilderModule,
+  deleteCourseBuilderModule,
+  createCourseBuilderLesson,
+  updateCourseBuilderLesson,
+  deleteCourseBuilderLesson,
+  reorderCourseBuilderModules,
+  reorderCourseBuilderLessons,
+  publishCourseBuilderCourse,
   createWorkshop,
   updateWorkshop,
   deleteWorkshop,
@@ -1244,3 +1601,4 @@ export const lmsAdminService = {
   syncAccessFromSource,
   updateSettings,
 }
+
