@@ -73,9 +73,12 @@ const buildCreateCoursePayload = (payload = {}) => {
   const title = normalizeText(payload.title)
   const slug = normalizeText(payload.slug) || slugify(title || `course-${Date.now()}`)
   const rawPrice = toNullableFiniteNumber(payload.price)
-  const isPaid = toBoolean(payload.isPaid ?? payload.is_paid, rawPrice !== null && rawPrice > 0)
-  const price = isPaid ? rawPrice : 0
   const discountPrice = toNullableFiniteNumber(payload.discountPrice ?? payload.discount_price)
+  const inferredIsPaidFromAmount =
+    (rawPrice !== null && rawPrice > 0) || (discountPrice !== null && discountPrice > 0)
+  const requestedIsPaid = toBoolean(payload.isPaid ?? payload.is_paid, inferredIsPaidFromAmount)
+  const isPaid = requestedIsPaid || inferredIsPaidFromAmount
+  const price = isPaid ? (rawPrice ?? 0) : 0
 
   return {
     title,

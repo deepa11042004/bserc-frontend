@@ -171,6 +171,16 @@ const formatInr = (value = 0) => {
   }).format(amount)
 }
 
+const parseMoneyValue = (value) => {
+  if (value === null || value === undefined) return null
+
+  const cleaned = String(value).trim().replace(/,/g, '')
+  if (!cleaned) return null
+
+  const parsed = Number(cleaned)
+  return Number.isFinite(parsed) ? parsed : NaN
+}
+
 const stripFileExtension = (name = '') => {
   const index = name.lastIndexOf('.')
   if (index <= 0) return name
@@ -619,8 +629,8 @@ const SuperAdminDashboard = () => {
       const language = workshopForm.language.trim()
       const instructorId = Number.parseInt(String(workshopForm.instructorId || ''), 10)
 
-      const parsedPrice = workshopForm.price === '' ? null : Number(workshopForm.price)
-      const parsedDiscount = workshopForm.discountPrice === '' ? null : Number(workshopForm.discountPrice)
+      const parsedPrice = parseMoneyValue(workshopForm.price)
+      const parsedDiscount = parseMoneyValue(workshopForm.discountPrice)
       const parsedDuration = workshopForm.totalDurationMinutes === '' ? 0 : Number(workshopForm.totalDurationMinutes)
 
       if (!title) throw new Error('Title is required.')
@@ -635,7 +645,12 @@ const SuperAdminDashboard = () => {
         throw new Error('Valid Instructor ID is required.')
       }
 
-      if (workshopForm.isPaid && (parsedPrice === null || !Number.isFinite(parsedPrice))) {
+      const effectiveIsPaid =
+        workshopForm.isPaid ||
+        (parsedPrice !== null && Number.isFinite(parsedPrice) && parsedPrice > 0) ||
+        (parsedDiscount !== null && Number.isFinite(parsedDiscount) && parsedDiscount > 0)
+
+      if (effectiveIsPaid && (parsedPrice === null || !Number.isFinite(parsedPrice))) {
         throw new Error('Price is required when Is Paid is enabled.')
       }
 
@@ -643,7 +658,7 @@ const SuperAdminDashboard = () => {
         throw new Error('Price must be greater than or equal to 0.')
       }
 
-      const price = workshopForm.isPaid ? (parsedPrice ?? 0) : 0
+      const price = effectiveIsPaid ? (parsedPrice ?? 0) : 0
 
       if (parsedDiscount !== null && (!Number.isFinite(parsedDiscount) || parsedDiscount < 0)) {
         throw new Error('Discount Price must be greater than or equal to 0.')
@@ -668,7 +683,7 @@ const SuperAdminDashboard = () => {
         price,
         discountPrice: parsedDiscount,
         currency: workshopForm.currency || 'INR',
-        isPaid: workshopForm.isPaid,
+        isPaid: effectiveIsPaid,
         lifetimeAccess: workshopForm.lifetimeAccess,
         certificateAvailable: workshopForm.certificateAvailable,
         instructorId,
@@ -1109,7 +1124,7 @@ const SuperAdminDashboard = () => {
             <button
               type="button"
               onClick={() => setSelectedWorkshopForBuilder(null)}
-              className="inline-flex items-center rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 transition hover:bg-slate-800"
+              className="inline-flex items-center rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-slate-200 transition hover:bg-zinc-800"
             >
               Back to All Courses
             </button>
@@ -1163,7 +1178,7 @@ const SuperAdminDashboard = () => {
               <select
                 value={workshopStatusFilter}
                 onChange={(event) => setWorkshopStatusFilter(event.target.value)}
-                className="rounded-md border border-sky-700/40 bg-slate-900 px-3 py-2 text-sm text-slate-200 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                className="rounded-md border border-sky-700/40 bg-zinc-900 px-3 py-2 text-sm text-slate-200 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
               >
                 <option value="all">All statuses</option>
                 <option value="published">Published</option>
@@ -1175,7 +1190,7 @@ const SuperAdminDashboard = () => {
                 onClick={() => {
                   void loadSnapshot({ silent: true })
                 }}
-                className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white transition hover:bg-slate-700"
+                className="inline-flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-white transition hover:bg-zinc-700"
               >
                 <RefreshCw className="h-4 w-4" /> Refresh
               </button>
@@ -1191,16 +1206,16 @@ const SuperAdminDashboard = () => {
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {filteredWorkshops.map((workshop) => {
-              const thumbnailSource = workshop.thumbnailBlobUrl || workshop.thumbnailUrl || ''
+              const thumbnailSource = workshop.thumbnailBlobUrl || workshop.thumbnailUrl || workshop.thumbnail || null
 
               return (
                 <article
                   key={workshop.id}
                   onClick={() => setSelectedWorkshopForBuilder(workshop)}
-                  className="overflow-hidden rounded-lg border border-slate-800 bg-slate-950 shadow-sm shadow-sky-500/5 cursor-pointer hover:border-sky-500/50 hover:shadow-sky-500/10 transition-all duration-200"
+                  className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 shadow-sm shadow-sky-500/5 cursor-pointer hover:border-sky-500/50 hover:shadow-sky-500/10 transition-all duration-200"
                 >
                   {thumbnailSource ? (
-                    <img src={thumbnailSource} alt={workshop.title} className="h-36 w-full object-cover" />
+                    <img src={thumbnailSource} alt={workshop.title} className="h-36 w-full object-cover" loading="lazy" />
                   ) : (
                     <div className="h-36 w-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950" />
                   )}
@@ -1234,7 +1249,7 @@ const SuperAdminDashboard = () => {
                       <div>Instructor ID: {workshop.instructorId || workshop.instructor_id || '—'}</div>
                     </div>
 
-                    <div className="flex items-center justify-between rounded-md border border-slate-800 bg-slate-900 px-2.5 py-2 text-xs text-slate-200">
+                    <div className="flex items-center justify-between rounded-md border border-zinc-800 bg-zinc-900 px-2.5 py-2 text-xs text-slate-200">
                       <span className="text-emerald-200">{formatInr(workshop.price || 0)}</span>
                       <span className="text-slate-300">{workshop.enrolledStudents || 0} enrolled</span>
                     </div>
@@ -1263,7 +1278,7 @@ const SuperAdminDashboard = () => {
       )}
 
       <div className="space-y-4">
-        <div className="rounded-xl border border-sky-600/20 bg-slate-900 p-4 shadow-xl shadow-sky-500/10">
+        <div className="rounded-xl border border-sky-600/20 bg-zinc-900 p-4 shadow-xl shadow-sky-500/10">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-sky-300">Create Course</h2>
           </div>
@@ -1276,7 +1291,7 @@ const SuperAdminDashboard = () => {
                 value={workshopForm.title}
                 onChange={(event) => setWorkshopForm((prev) => ({ ...prev, title: event.target.value }))}
                 placeholder="Satellite Design Foundation"
-                className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
                 required
               />
             </label>
@@ -1292,7 +1307,7 @@ const SuperAdminDashboard = () => {
                     setWorkshopForm((prev) => ({ ...prev, slug: event.target.value }))
                   }}
                   placeholder="satellite-design-foundation"
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
                   required
                 />
               </label>
@@ -1304,7 +1319,7 @@ const SuperAdminDashboard = () => {
                   value={workshopForm.subtitle}
                   onChange={(event) => setWorkshopForm((prev) => ({ ...prev, subtitle: event.target.value }))}
                   placeholder="Structured recording track for LMS"
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
                 />
               </label>
             </div>
@@ -1316,7 +1331,7 @@ const SuperAdminDashboard = () => {
                 onChange={(event) => setWorkshopForm((prev) => ({ ...prev, description: event.target.value }))}
                 rows={3}
                 placeholder="What this course recording covers"
-                className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
               />
             </label>
 
@@ -1328,7 +1343,7 @@ const SuperAdminDashboard = () => {
                   value={workshopForm.category}
                   onChange={(event) => setWorkshopForm((prev) => ({ ...prev, category: event.target.value }))}
                   placeholder="Course"
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
                 />
               </label>
 
@@ -1337,7 +1352,7 @@ const SuperAdminDashboard = () => {
                 <select
                   value={workshopForm.level}
                   onChange={(event) => setWorkshopForm((prev) => ({ ...prev, level: event.target.value }))}
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
                 >
                   <option value="Beginner">Beginner</option>
                   <option value="Intermediate">Intermediate</option>
@@ -1354,7 +1369,7 @@ const SuperAdminDashboard = () => {
                   value={workshopForm.language}
                   onChange={(event) => setWorkshopForm((prev) => ({ ...prev, language: event.target.value }))}
                   placeholder="English"
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
                   required
                 />
               </label>
@@ -1368,7 +1383,7 @@ const SuperAdminDashboard = () => {
                   value={workshopForm.instructorId}
                   onChange={(event) => setWorkshopForm((prev) => ({ ...prev, instructorId: event.target.value }))}
                   placeholder="e.g. 12"
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
                   required
                 />
               </label>
@@ -1384,7 +1399,7 @@ const SuperAdminDashboard = () => {
                   value={workshopForm.price}
                   onChange={(event) => setWorkshopForm((prev) => ({ ...prev, price: event.target.value }))}
                   placeholder="0"
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
                 />
               </label>
 
@@ -1397,7 +1412,7 @@ const SuperAdminDashboard = () => {
                   value={workshopForm.discountPrice}
                   onChange={(event) => setWorkshopForm((prev) => ({ ...prev, discountPrice: event.target.value }))}
                   placeholder="Optional"
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
                 />
               </label>
             </div>
@@ -1410,7 +1425,7 @@ const SuperAdminDashboard = () => {
                   value={workshopForm.currency}
                   onChange={(event) => setWorkshopForm((prev) => ({ ...prev, currency: event.target.value.toUpperCase() }))}
                   placeholder="INR"
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
                 />
               </label>
 
@@ -1423,13 +1438,13 @@ const SuperAdminDashboard = () => {
                   value={workshopForm.totalDurationMinutes}
                   onChange={(event) => setWorkshopForm((prev) => ({ ...prev, totalDurationMinutes: event.target.value }))}
                   placeholder="0"
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
                 />
               </label>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
-              <label className="flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs uppercase tracking-[0.12em] text-slate-300">
+              <label className="flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs uppercase tracking-[0.12em] text-slate-300">
                 <input
                   type="checkbox"
                   checked={workshopForm.isPaid}
@@ -1439,7 +1454,7 @@ const SuperAdminDashboard = () => {
                 Is Paid
               </label>
 
-              <label className="flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs uppercase tracking-[0.12em] text-slate-300">
+              <label className="flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs uppercase tracking-[0.12em] text-slate-300">
                 <input
                   type="checkbox"
                   checked={workshopForm.lifetimeAccess}
@@ -1449,7 +1464,7 @@ const SuperAdminDashboard = () => {
                 Lifetime Access
               </label>
 
-              <label className="flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-xs uppercase tracking-[0.12em] text-slate-300">
+              <label className="flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs uppercase tracking-[0.12em] text-slate-300">
                 <input
                   type="checkbox"
                   checked={workshopForm.certificateAvailable}
@@ -1466,7 +1481,7 @@ const SuperAdminDashboard = () => {
                 type="file"
                 accept="image/*"
                 onChange={(event) => handleWorkshopThumbChange(event.target.files?.[0])}
-                className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-slate-200 focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
               />
             </label>
 
@@ -1488,10 +1503,10 @@ const SuperAdminDashboard = () => {
           </form>
         </div>
 
-        <div className="rounded-xl border border-sky-600/20 bg-slate-900 p-4">
+        <div className="rounded-xl border border-sky-600/20 bg-zinc-900 p-4">
           <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-300">Live Preview</h3>
 
-          <div className="mt-3 rounded-md border border-slate-800 bg-slate-900 p-3">
+          <div className="mt-3 rounded-md border border-zinc-800 bg-zinc-900 p-3">
             <div className="text-sm font-semibold text-white">{workshopForm.title || 'Course title preview'}</div>
             <div className="mt-1 text-xs text-slate-400">/{workshopForm.slug || 'auto-generated-slug'}</div>
             <p className="mt-2 line-clamp-3 text-xs text-slate-400">
@@ -1530,7 +1545,7 @@ const SuperAdminDashboard = () => {
 
   const renderModules = () => (
     <section className="grid gap-4 xl:grid-cols-[1.2fr_2fr]">
-      <div className="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-4 shadow-lg shadow-sky-500/5">
+      <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900 p-4 shadow-lg shadow-sky-500/5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Module Builder</h2>
 
@@ -1553,12 +1568,12 @@ const SuperAdminDashboard = () => {
             value={newModuleTitle}
             onChange={(event) => setNewModuleTitle(event.target.value)}
             placeholder="New module title"
-            className="min-w-0 flex-1 rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+            className="min-w-0 flex-1 rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
           />
 
           <button
             type="submit"
-            className="inline-flex items-center gap-1 rounded-md border border-slate-700 px-3 py-2 text-sm text-slate-100 transition hover:bg-slate-800"
+            className="inline-flex items-center gap-1 rounded-md border border-zinc-700 px-3 py-2 text-sm text-slate-100 transition hover:bg-zinc-800"
           >
             <Plus className="h-4 w-4" /> Add
           </button>
@@ -1578,7 +1593,7 @@ const SuperAdminDashboard = () => {
                 onDragEnd={() => setDragModuleIndex(null)}
                 className={`rounded-md border px-3 py-2 transition ${selectedModuleId === module.id
                     ? 'border-cyan-700 bg-cyan-700/10'
-                    : 'border-slate-800 bg-slate-950 hover:border-slate-700'
+                    : 'border-zinc-800 bg-zinc-950 hover:border-zinc-700'
                   }`}
               >
                 <button
@@ -1594,7 +1609,7 @@ const SuperAdminDashboard = () => {
                   <button
                     type="button"
                     onClick={() => handleRenameModule(module)}
-                    className="inline-flex items-center gap-1 rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-200 transition hover:bg-slate-800"
+                    className="inline-flex items-center gap-1 rounded-md border border-zinc-700 px-2 py-1 text-xs text-slate-200 transition hover:bg-zinc-800"
                   >
                     <Pencil className="h-3.5 w-3.5" /> Rename
                   </button>
@@ -2402,14 +2417,14 @@ const SuperAdminDashboard = () => {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-200">
+      <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-slate-200">
         Loading super admin dashboard...
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div className="min-h-screen bg-zinc-950 text-white">
       <div className="flex min-h-screen">
         <SuperAdminSidebar
           sections={sidebarSections}

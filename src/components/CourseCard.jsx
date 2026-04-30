@@ -7,7 +7,7 @@ import { FaStar } from 'react-icons/fa'
 
 const HOVER_DELAY = 140
 
-const CourseCard = ({ title, instructor, rating, price, image, description, learningPoints }) => {
+const CourseCard = ({ title, instructor, rating, price, image, thumbnail, thumbnailUrl, description, learningPoints }) => {
   const slug = encodeURIComponent(title.toLowerCase().replace(/\s+/g, '-'))
   const navigate = useNavigate()
   const { addToCart } = useCart()
@@ -20,6 +20,7 @@ const CourseCard = ({ title, instructor, rating, price, image, description, lear
   const safeTitle = title || 'Untitled course'
   const safePrice = price || '₹0'
   const safeRating = rating || '4.7'
+  const safeImage = image || thumbnailUrl || thumbnail || ''
   const shortDescription = description || `Learn the essentials of ${safeTitle} with practical lessons and examples.`
   const points = learningPoints?.length
     ? learningPoints
@@ -35,7 +36,7 @@ const CourseCard = ({ title, instructor, rating, price, image, description, lear
     instructor,
     rating: safeRating,
     price: safePrice,
-    image,
+    image: safeImage,
     description,
   }
 
@@ -89,7 +90,11 @@ const CourseCard = ({ title, instructor, rating, price, image, description, lear
         className="relative block overflow-visible rounded-2xl border border-indigo-500/20 bg-[#1F2937] shadow-[0_10px_30px_rgba(0,0,0,0.4)] transition hover:shadow-[0_0_25px_rgba(59,130,246,0.35)]"
       >
         <div className="overflow-hidden rounded-t-2xl">
-          <img src={image} alt={title} className="h-40 w-full object-cover" />
+          {safeImage ? (
+            <img src={safeImage} alt={title} className="h-40 w-full object-cover" loading="lazy" />
+          ) : (
+            <div className="h-40 w-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950" />
+          )}
         </div>
         <div className="space-y-2 p-4">
           <h3 className="line-clamp-2 font-semibold text-white tracking-wide">{safeTitle}</h3>

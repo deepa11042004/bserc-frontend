@@ -49,7 +49,7 @@ const SuperAdminSidebar = ({
                             onClose()
                           }}
                           className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition ${isActive
-                            ? 'bg-slate-800 font-medium text-white'
+                            ? 'bg-zinc-800 font-medium text-white'
                             : 'text-slate-300 hover:bg-sky-600/10 hover:text-sky-200'
                             }`}
                         >
@@ -80,7 +80,7 @@ const SuperAdminSidebar = ({
                   onClose()
                 }}
                 className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition ${isActive
-                  ? 'bg-slate-800 font-medium text-white'
+                  ? 'bg-zinc-800 font-medium text-white'
                   : 'text-slate-300 hover:bg-sky-600/10 hover:text-sky-200'
                   }`}
               >
