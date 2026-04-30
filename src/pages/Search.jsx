@@ -3,63 +3,86 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { FiFilter, FiSearch, FiStar } from 'react-icons/fi'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
-import {
-  aiCourses,
-  courseDetailsData,
-  skillsCourses,
-  trendingCourses,
-} from '../data/homeData'
 import { useCart } from '../context/CartContext'
+import { publicCourseService } from '../services/publicCourseService'
 
 const pageSize = 6
-
-const normalizeCourses = () => {
-  const courses = [
-    ...trendingCourses,
-    ...skillsCourses,
-    ...aiCourses,
-    { ...courseDetailsData },
-  ]
-
-  return courses.map((c, idx) => ({
-    id: c.courseId || c.id || `c-${idx}`,
-    title: c.title,
-    instructor: c.instructor || c.duration || 'Instructor',
-    rating: c.rating || 4.5,
-    students: c.students || '10,000',
-    image: c.image || c.videoPreview,
-    price: c.price || '₹799',
-    level: c.level || 'All Levels',
-    language: c.language || 'English',
-    tags: c.tags || c.relatedTopics || [],
-    description: c.description || c.subtitle || 'Upskill with hands-on content.',
-  }))
-}
 
 const filters = {
   level: ['All Levels', 'Beginner', 'Intermediate', 'Advanced'],
   rating: ['4.5 & up', '4.0 & up', '3.5 & up'],
-  language: ['English', 'Hindi', 'Spanish'],
 }
-
-const relatedSearches = ['Generative AI', 'Python', 'AWS', 'Data Science', 'React', 'Prompt Engineering']
 
 const Search = () => {
   const { addToCart } = useCart()
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
+  const [allCourses, setAllCourses] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
 
-  const allCourses = useMemo(normalizeCourses, [])
-
   const query = params.get('q') || ''
+  const category = params.get('category') || ''
   const level = params.get('level') || 'All Levels'
   const rating = params.get('rating') || '4.0 & up'
-  const language = params.get('language') || 'English'
+  const language = params.get('language') || 'All Languages'
 
   useEffect(() => {
     setCurrentPage(Number(params.get('page') || 1))
   }, [params])
+
+  useEffect(() => {
+    let active = true
+
+    const loadCourses = async () => {
+      setLoading(true)
+
+      try {
+        const courses = await publicCourseService.getPublishedCourses()
+        if (!active) return
+
+        setAllCourses(courses)
+        setLoadError('')
+      } catch (error) {
+        if (!active) return
+
+        setAllCourses([])
+        setLoadError(error?.message || 'Could not load courses right now.')
+      } finally {
+        if (active) {
+          setLoading(false)
+        }
+      }
+    }
+
+    void loadCourses()
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const languageOptions = useMemo(() => {
+    const options = new Set(['All Languages'])
+    allCourses.forEach((course) => {
+      if (course.language) options.add(course.language)
+    })
+    return [...options]
+  }, [allCourses])
+
+  const relatedSearches = useMemo(() => {
+    const topics = new Set()
+
+    allCourses.forEach((course) => {
+      if (course.category) topics.add(course.category)
+      ;(course.tags || []).forEach((tag) => {
+        if (tag) topics.add(tag)
+      })
+    })
+
+    return [...topics].slice(0, 8)
+  }, [allCourses])
 
   const handleParamChange = (key, value) => {
     const next = new URLSearchParams(params)
@@ -83,15 +106,17 @@ const Search = () => {
     const ratingNum = parseFloat(course.rating)
     const ratingThreshold = rating.startsWith('4.5') ? 4.5 : rating.startsWith('4.0') ? 4.0 : 3.5
     return (
+      (!category || course.category === category) &&
       (level === 'All Levels' || course.level === level) &&
       ratingNum >= ratingThreshold &&
-      (language ? course.language === language : true)
+      (language === 'All Languages' || course.language === language)
     )
   }
 
   const filteredCourses = allCourses.filter((c) => matchesQuery(c) && matchesFilters(c))
   const totalPages = Math.max(1, Math.ceil(filteredCourses.length / pageSize))
-  const pageCourses = filteredCourses.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const safePage = Math.min(Math.max(currentPage, 1), totalPages)
+  const pageCourses = filteredCourses.slice((safePage - 1) * pageSize, safePage * pageSize)
 
   const applySearch = (term) => {
     const next = new URLSearchParams(params)
@@ -119,26 +144,33 @@ const Search = () => {
               <div className="flex flex-wrap gap-2 text-sm text-slate-200">
                 <FilterSelect label="Level" options={filters.level} value={level} onChange={(v) => handleParamChange('level', v)} />
                 <FilterSelect label="Rating" options={filters.rating} value={rating} onChange={(v) => handleParamChange('rating', v)} />
-                <FilterSelect label="Language" options={filters.language} value={language} onChange={(v) => handleParamChange('language', v)} />
+                <FilterSelect label="Language" options={languageOptions} value={language} onChange={(v) => handleParamChange('language', v)} />
               </div>
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-300">
-              <span className="text-slate-400">Recommended in {query || 'learning'}</span>
-              {relatedSearches.map((tag) => (
-                <button
-                  key={tag}
-                  className="rounded-full border border-slate-800 bg-slate-900 px-3 py-1 transition hover:border-indigo-600 hover:text-indigo-200"
-                  onClick={() => applySearch(tag)}
-                >
-                  {tag}
-                </button>
-              ))}
+              {relatedSearches.length > 0 ? (
+                <>
+                  <span className="text-slate-400">Recommended in {query || 'learning'}</span>
+                  {relatedSearches.map((tag) => (
+                    <button
+                      key={tag}
+                      className="rounded-full border border-slate-800 bg-slate-900 px-3 py-1 transition hover:border-indigo-600 hover:text-indigo-200"
+                      onClick={() => applySearch(tag)}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </>
+              ) : (
+                <span className="text-slate-400">Search suggestions will appear as courses are published.</span>
+              )}
             </div>
           </div>
 
           <div className="flex items-center justify-between text-sm text-slate-300">
             <div>
-              {filteredCourses.length} results for <span className="font-semibold text-white">{query || 'all courses'}</span>
+              {loading ? 'Loading courses...' : `${filteredCourses.length} results for `}
+              {!loading && <span className="font-semibold text-white">{query || 'all courses'}</span>}
             </div>
             <button
               className="flex items-center gap-2 rounded-full border border-slate-800 px-3 py-1 text-xs text-slate-300 transition hover:border-indigo-600 hover:text-indigo-200"
@@ -149,12 +181,33 @@ const Search = () => {
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {pageCourses.map((course) => (
-              <CourseResult key={course.id} course={course} onCart={() => addToCart({ ...course, id: course.id })} />
+            {!loading && pageCourses.map((course) => (
+              <CourseResult
+                key={course.slug || course.id}
+                course={course}
+                onCart={() =>
+                  addToCart({
+                    courseId: course.slug || String(course.apiCourseId || course.id),
+                    slug: course.slug,
+                    apiCourseId: course.apiCourseId,
+                    title: course.title,
+                    instructor: course.instructor,
+                    price: course.price,
+                    image: course.image || course.thumbnail,
+                    thumbnail: course.thumbnail,
+                  })
+                }
+                onPreview={() => navigate(`/course/${encodeURIComponent(course.slug || course.courseId || course.id)}`)}
+              />
             ))}
-            {pageCourses.length === 0 && (
+            {loading && (
               <div className="col-span-full rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-center text-slate-300">
-                No courses found. Try a different query or relax filters.
+                Loading published courses...
+              </div>
+            )}
+            {!loading && pageCourses.length === 0 && (
+              <div className="col-span-full rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-center text-slate-300">
+                {loadError || 'No courses found. Try a different query or relax filters.'}
               </div>
             )}
           </div>
@@ -163,12 +216,12 @@ const Search = () => {
             <div className="mt-4 flex items-center justify-center gap-2">
               {Array.from({ length: totalPages }).map((_, idx) => {
                 const page = idx + 1
-                const active = page === currentPage
+                const active = page === safePage
                 return (
                   <button
                     key={page}
                     className={`h-9 w-9 rounded-full border ${active ? 'border-indigo-500 bg-indigo-600 text-white' : 'border-slate-800 text-slate-300'} transition hover:border-indigo-600 hover:text-white`}
-                    onClick={() => handleParamChange('page', page)}
+                    onClick={() => handleParamChange('page', String(page))}
                   >
                     {page}
                   </button>
@@ -200,7 +253,7 @@ const FilterSelect = ({ label, options, value, onChange }) => (
   </label>
 )
 
-const CourseResult = ({ course, onCart }) => (
+const CourseResult = ({ course, onCart, onPreview }) => (
   <div className="flex gap-4 rounded-2xl border border-slate-800 bg-[#0f172a] p-4 shadow-xl shadow-black/40">
     {course.image ? (
       <img src={course.image} alt={course.title} className="h-28 w-44 rounded-lg object-cover" />
@@ -238,7 +291,7 @@ const CourseResult = ({ course, onCart }) => (
         </button>
         <button
           className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-100 transition hover:border-indigo-500 hover:text-indigo-200"
-          onClick={() => alert('Preview coming soon')}
+          onClick={onPreview}
         >
           Preview
         </button>

@@ -7,8 +7,28 @@ import { FaStar } from 'react-icons/fa'
 
 const HOVER_DELAY = 140
 
-const CourseCard = ({ title, instructor, rating, price, image, thumbnail, thumbnailUrl, description, learningPoints }) => {
-  const slug = encodeURIComponent(title.toLowerCase().replace(/\s+/g, '-'))
+const safeDecodeURIComponent = (value = '') => {
+  try {
+    return decodeURIComponent(String(value || ''))
+  } catch {
+    return String(value || '')
+  }
+}
+
+const CourseCard = ({
+  title,
+  instructor,
+  rating,
+  price,
+  image,
+  thumbnail,
+  thumbnailUrl,
+  description,
+  learningPoints,
+  courseId,
+  slug,
+  apiCourseId,
+}) => {
   const navigate = useNavigate()
   const { addToCart } = useCart()
   const [hover, setHover] = useState(false)
@@ -18,6 +38,9 @@ const CourseCard = ({ title, instructor, rating, price, image, thumbnail, thumbn
   const [anchor, setAnchor] = useState(null)
 
   const safeTitle = title || 'Untitled course'
+  const resolvedSlug =
+    safeDecodeURIComponent(slug || courseId || '') || safeTitle.toLowerCase().replace(/\s+/g, '-')
+  const encodedSlug = encodeURIComponent(resolvedSlug)
   const safePrice = price || '₹0'
   const safeRating = rating || '4.7'
   const safeImage = image || thumbnailUrl || thumbnail || ''
@@ -31,12 +54,15 @@ const CourseCard = ({ title, instructor, rating, price, image, thumbnail, thumbn
       ]
 
   const courseData = {
-    courseId: slug,
+    courseId: resolvedSlug,
+    slug: resolvedSlug,
+    apiCourseId,
     title: safeTitle,
     instructor,
     rating: safeRating,
     price: safePrice,
     image: safeImage,
+    thumbnail: safeImage,
     description,
   }
 
@@ -83,7 +109,7 @@ const CourseCard = ({ title, instructor, rating, price, image, thumbnail, thumbn
       onMouseMove={updateAnchor}
     >
       <Link
-        to={`/course/${slug}`}
+        to={`/course/${encodedSlug}`}
         state={{ course: courseData }}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
@@ -125,7 +151,7 @@ const CourseCard = ({ title, instructor, rating, price, image, thumbnail, thumbn
             anchor={anchor}
             points={points}
             onAdd={() => addToCart(courseData)}
-            onView={() => navigate(`/course/${slug}`, { state: { course: courseData } })}
+            onView={() => navigate(`/course/${encodedSlug}`, { state: { course: courseData } })}
           />
         )}
       </Link>

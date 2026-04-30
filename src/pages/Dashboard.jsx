@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import HeroSection from '../components/HeroSection'
@@ -7,12 +7,70 @@ import { User } from 'lucide-react'
 import SectionHeader from '../components/SectionHeader'
 import { FiArrowLeft, FiArrowRight } from 'react-icons/fi'
 import CourseCard from '../components/CourseCard'
+import { publicCourseService } from '../services/publicCourseService'
 
-import { aiCourses, footerColumns, navLinks, trendingCourses } from '../data/homeData'
+import { footerColumns, navLinks } from '../data/homeData'
+
+const getCourseKey = (course = {}) =>
+    String(course.slug || course.apiCourseId || course.id || course.courseId || '')
+
+const getCourseSortTime = (course = {}) => {
+    const raw = course.updatedAt || course.createdAt
+    if (!raw) return 0
+
+    const time = new Date(raw).getTime()
+    return Number.isFinite(time) ? time : 0
+}
 
 function Dashboard() {
-    const aiSliderRef = useRef(null)
-    const [aiIndex, setAiIndex] = useState(0)
+    const updatedSliderRef = useRef(null)
+    const [updatedIndex, setUpdatedIndex] = useState(0)
+    const [courses, setCourses] = useState([])
+
+    useEffect(() => {
+        let active = true
+
+        const loadCourses = async () => {
+            try {
+                const publishedCourses = await publicCourseService.getPublishedCourses()
+                if (!active) return
+                setCourses(publishedCourses)
+            } catch {
+                if (active) {
+                    setCourses([])
+                }
+            }
+        }
+
+        void loadCourses()
+
+        return () => {
+            active = false
+        }
+    }, [])
+
+    const trendingCourses = useMemo(() => courses.slice(0, 4), [courses])
+    const updatedCourses = useMemo(() => {
+        if (!courses.length) return []
+
+        const sortedByRecency = [...courses].sort(
+            (courseA, courseB) => getCourseSortTime(courseB) - getCourseSortTime(courseA),
+        )
+
+        const trendingCourseKeys = new Set(trendingCourses.map((course) => getCourseKey(course)).filter(Boolean))
+        const nonTrendingCourses = sortedByRecency.filter(
+            (course) => !trendingCourseKeys.has(getCourseKey(course)),
+        )
+
+        const source = nonTrendingCourses.length ? nonTrendingCourses : sortedByRecency
+        return source.slice(0, 8)
+    }, [courses, trendingCourses])
+
+    useEffect(() => {
+        if (!updatedCourses.length) return
+        if (updatedIndex < updatedCourses.length) return
+        setUpdatedIndex(0)
+    }, [updatedCourses.length, updatedIndex])
 
     const scrollSlider = (ref, direction, index, setIndex, length) => {
         if (!ref.current) return
@@ -59,9 +117,12 @@ function Dashboard() {
                     />
                     <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
                         {trendingCourses.map((course) => (
-                            <CourseCard key={course.title} {...course} />
+                            <CourseCard key={course.slug || course.id || course.title} {...course} />
                         ))}
                     </div>
+                    {!trendingCourses.length && (
+                        <p className="mt-3 text-sm text-slate-400">No published courses available right now.</p>
+                    )}
                 </section>
 
                 <div className="bg-[#0f172a] p-8 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.4)]">
@@ -91,7 +152,7 @@ function Dashboard() {
                     <div className="mb-4 flex justify-end gap-2">
                         <button
                             onClick={() =>
-                                scrollSlider(aiSliderRef, 'left', aiIndex, setAiIndex, aiCourses.length)
+                                scrollSlider(updatedSliderRef, 'left', updatedIndex, setUpdatedIndex, updatedCourses.length)
                             }
                             className="rounded-full border border-indigo-500/40 bg-[#111827] p-2 text-slate-100 transition hover:border-[#3B82F6] hover:text-white"
                             aria-label="Scroll left"
@@ -100,7 +161,7 @@ function Dashboard() {
                         </button>
                         <button
                             onClick={() =>
-                                scrollSlider(aiSliderRef, 'right', aiIndex, setAiIndex, aiCourses.length)
+                                scrollSlider(updatedSliderRef, 'right', updatedIndex, setUpdatedIndex, updatedCourses.length)
                             }
                             className="rounded-full border border-indigo-500/40 bg-[#111827] p-2 text-slate-100 transition hover:border-[#3B82F6] hover:text-white"
                             aria-label="Scroll right"
@@ -110,23 +171,18 @@ function Dashboard() {
                     </div>
 
                     <div
-                        ref={aiSliderRef}
+                        ref={updatedSliderRef}
                         className="no-scrollbar relative flex snap-x snap-mandatory gap-4 overflow-x-auto rounded-2xl bg-[#0b1224] p-5"
                     >
-                        {aiCourses.map((course, index) => (
-                            <div key={`${course.title}-${index}`} className="min-w-[260px] snap-start">
-                                <CourseCard
-                                    title={course.title}
-                                    instructor={course.duration}
-                                    rating={course.rating || '4.7'}
-                                    price={course.price || '₹2,499'}
-                                    image={course.image}
-                                    description={course.description}
-                                    learningPoints={course.learningPoints}
-                                />
+                        {updatedCourses.map((course, index) => (
+                            <div key={`${course.slug || course.id}-${index}`} className="min-w-[260px] snap-start">
+                                <CourseCard {...course} />
                             </div>
                         ))}
                     </div>
+                    {!updatedCourses.length && (
+                        <p className="mt-3 text-sm text-slate-400">Newly updated courses will appear here once published.</p>
+                    )}
                 </section>
 
                 <section>

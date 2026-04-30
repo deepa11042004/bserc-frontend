@@ -12,40 +12,93 @@ import SupportingSection from '../components/SupportingSection'
 import SkeletonCard from '../components/SkeletonCard'
 import TestimonialCard from '../components/TestimonialCard'
 import { useAuthState } from '../hooks/useAuth'
+import { publicCourseService } from '../services/publicCourseService'
 import {
-  aiCourses,
   careerPaths,
   categories,
   certifications,
   footerColumns,
   navLinks,
-  skillsCourses,
   testimonials,
-  trendingCourses,
 } from '../data/homeData'
+
+const getCourseKey = (course = {}) =>
+  String(course.slug || course.apiCourseId || course.id || course.courseId || '')
+
+const getCourseSortTime = (course = {}) => {
+  const raw = course.updatedAt || course.createdAt
+  if (!raw) return 0
+
+  const time = new Date(raw).getTime()
+  return Number.isFinite(time) ? time : 0
+}
 
 function Home() {
   const { user } = useAuthState()
   const categorySliderRef = useRef(null)
-  const aiSliderRef = useRef(null)
+  const updatedSliderRef = useRef(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [courseError, setCourseError] = useState('')
+  const [courses, setCourses] = useState([])
   const [categoryIndex, setCategoryIndex] = useState(0)
-  const [aiIndex, setAiIndex] = useState(0)
+  const [updatedIndex, setUpdatedIndex] = useState(0)
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setIsLoading(false)
-    }, 900)
+    let active = true
+
+    const loadCourses = async () => {
+      setIsLoading(true)
+
+      try {
+        const publishedCourses = await publicCourseService.getPublishedCourses()
+        if (!active) return
+
+        setCourses(publishedCourses)
+        setCourseError('')
+      } catch (error) {
+        if (!active) return
+        setCourses([])
+        setCourseError(error?.message || 'Could not load courses right now.')
+      } finally {
+        if (active) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    void loadCourses()
 
     return () => {
-      window.clearTimeout(timer)
+      active = false
     }
   }, [])
 
-  const visibleCourses = useMemo(() => (isLoading ? [] : skillsCourses), [isLoading])
+  const visibleCourses = useMemo(() => (isLoading ? [] : courses), [courses, isLoading])
+  const popularCourses = useMemo(() => visibleCourses.slice(0, 4), [visibleCourses])
+  const updatedCourses = useMemo(() => {
+    if (!visibleCourses.length) return []
+
+    const sortedByRecency = [...visibleCourses].sort(
+      (courseA, courseB) => getCourseSortTime(courseB) - getCourseSortTime(courseA),
+    )
+
+    const popularCourseKeys = new Set(popularCourses.map((course) => getCourseKey(course)).filter(Boolean))
+    const nonPopularCourses = sortedByRecency.filter(
+      (course) => !popularCourseKeys.has(getCourseKey(course)),
+    )
+
+    const source = nonPopularCourses.length ? nonPopularCourses : sortedByRecency
+    return source.slice(0, 8)
+  }, [popularCourses, visibleCourses])
   const isLearner = Boolean(user && user.role === 'user')
   const continueLearning = visibleCourses.slice(0, 2)
   const recommendedCourses = visibleCourses.slice(2, 6)
+
+  useEffect(() => {
+    if (!updatedCourses.length) return
+    if (updatedIndex < updatedCourses.length) return
+    setUpdatedIndex(0)
+  }, [updatedCourses.length, updatedIndex])
 
   const scrollSlider = (ref, direction, index, setIndex, length) => {
     if (!ref.current) return
@@ -117,10 +170,13 @@ function Home() {
             action="View all"
           />
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {trendingCourses.map((course) => (
-              <CourseCard key={course.title} {...course} />
+            {popularCourses.map((course) => (
+              <CourseCard key={course.slug || course.id || course.title} {...course} />
             ))}
           </div>
+          {!isLoading && !popularCourses.length && (
+            <p className="mt-3 text-sm text-slate-400">No published courses are available yet.</p>
+          )}
         </section>
 
         <section className="py-2">
@@ -213,11 +269,11 @@ function Home() {
             <button
               onClick={() =>
                 scrollSlider(
-                  aiSliderRef,
+                  updatedSliderRef,
                   'left',
-                  aiIndex,
-                  setAiIndex,
-                  aiCourses.length
+                  updatedIndex,
+                  setUpdatedIndex,
+                  updatedCourses.length
                 )
               }
               className="rounded-full bg-[#0f172a] p-2 shadow-lg shadow-[#3B82F6]/30 text-[#3B82F6] transition hover:bg-[#111827] hover:text-white"
@@ -228,11 +284,11 @@ function Home() {
             <button
               onClick={() =>
                 scrollSlider(
-                  aiSliderRef,
+                  updatedSliderRef,
                   'right',
-                  aiIndex,
-                  setAiIndex,
-                  aiCourses.length
+                  updatedIndex,
+                  setUpdatedIndex,
+                  updatedCourses.length
                 )
               }
               className="rounded-full bg-[#0f172a] p-2 shadow-lg shadow-[#3B82F6]/30 text-[#3B82F6] transition hover:bg-[#111827] hover:text-white"
@@ -243,23 +299,18 @@ function Home() {
           </div>
 
           <div
-            ref={aiSliderRef}
+            ref={updatedSliderRef}
             className="no-scrollbar relative flex snap-x snap-mandatory gap-4 overflow-x-auto rounded-2xl bg-teal-950 p-5"
           >
-            {aiCourses.map((course, index) => (
-              <div key={`${course.title}-${index}`} className="min-w-[260px] snap-start">
-                <CourseCard
-                  title={course.title}
-                  instructor={course.duration}
-                  rating={course.rating || '4.7'}
-                  price={course.price || '₹2,499'}
-                  image={course.image}
-                  description={course.description}
-                  learningPoints={course.learningPoints}
-                />
+            {updatedCourses.map((course, index) => (
+              <div key={`${course.slug || course.id}-${index}`} className="min-w-[260px] snap-start">
+                <CourseCard {...course} />
               </div>
             ))}
           </div>
+          {!isLoading && !updatedCourses.length && (
+            <p className="mt-3 text-sm text-slate-400">Newly updated courses will appear here when available.</p>
+          )}
         </section>
 
         {isLearner && (
@@ -271,7 +322,7 @@ function Home() {
               />
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-2">
                 {continueLearning.map((course) => (
-                  <CourseCard key={`continue-${course.title}`} {...course} />
+                  <CourseCard key={`continue-${course.slug || course.id || course.title}`} {...course} />
                 ))}
               </div>
             </div>
@@ -283,7 +334,7 @@ function Home() {
               />
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
                 {recommendedCourses.map((course) => (
-                  <CourseCard key={`recommended-${course.title}`} {...course} />
+                  <CourseCard key={`recommended-${course.slug || course.id || course.title}`} {...course} />
                 ))}
               </div>
             </div>
@@ -340,8 +391,11 @@ function Home() {
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {isLoading
               ? Array.from({ length: 4 }).map((_, index) => <SkeletonCard key={index} />)
-              : visibleCourses.map((course) => <CourseCard key={course.title} {...course} />)}
+              : visibleCourses.map((course) => <CourseCard key={course.slug || course.id || course.title} {...course} />)}
           </div>
+          {!isLoading && !visibleCourses.length && (
+            <p className="mt-3 text-sm text-slate-400">{courseError || 'No published courses found.'}</p>
+          )}
         </section>
 
         <SupportingSection />

@@ -1,39 +1,63 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { FiSearch } from 'react-icons/fi'
-import {
-  aiCourses,
-  courseDetailsData,
-  skillsCourses,
-  trendingCourses,
-} from '../data/homeData'
-
-const buildCourses = () => {
-  const list = [
-    ...trendingCourses,
-    ...skillsCourses,
-    ...aiCourses,
-    { ...courseDetailsData },
-  ]
-  return list.map((c) => ({
-    id: c.courseId || c.id || c.title,
-    title: c.title,
-    instructor: c.instructor || c.duration || 'Instructor',
-    image: c.image || c.videoPreview,
-    tags: c.tags || c.relatedTopics || [],
-  }))
-}
-
-const recommendedTopics = ['Generative AI', 'AWS Certification', 'Machine Learning', 'Data Science']
+import { publicCourseService } from '../services/publicCourseService'
 
 const SearchBar = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
+  const [courses, setCourses] = useState([])
   const containerRef = useRef(null)
 
-  const courses = useMemo(buildCourses, [])
+  useEffect(() => {
+    let active = true
+
+    const loadCourses = async () => {
+      try {
+        const list = await publicCourseService.getPublishedCourses()
+        if (!active) return
+
+        setCourses(
+          list.map((course) => ({
+            id: course.id || course.courseId,
+            slug: course.slug || course.courseId,
+            title: course.title,
+            instructor: course.instructor,
+            image: course.image || course.thumbnail,
+            tags: course.tags || [],
+            category: course.category,
+            level: course.level,
+          })),
+        )
+      } catch {
+        if (active) {
+          setCourses([])
+        }
+      }
+    }
+
+    void loadCourses()
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const recommendedTopics = useMemo(() => {
+    const topicSet = new Set()
+
+    courses.forEach((course) => {
+      if (course.category) topicSet.add(course.category)
+      if (course.level) topicSet.add(course.level)
+      ;(course.tags || []).forEach((tag) => {
+        if (tag) topicSet.add(tag)
+      })
+    })
+
+    return [...topicSet].slice(0, 8)
+  }, [courses])
 
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -110,7 +134,10 @@ const SearchBar = () => {
                 <button
                   key={c.id}
                   type="button"
-                  onClick={() => handleSubmit(c.title)}
+                  onClick={() => {
+                    navigate(`/course/${encodeURIComponent(c.slug || c.id)}`)
+                    setOpen(false)
+                  }}
                   className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-slate-100 transition hover:bg-slate-800"
                 >
                   {c.image ? <img src={c.image} alt={c.title} className="h-10 w-14 rounded object-cover" /> : <div className="h-10 w-14 rounded bg-slate-700" />}
@@ -123,18 +150,22 @@ const SearchBar = () => {
             })}
           </div>
           <div className="border-t border-slate-800 bg-slate-900/80 px-4 py-3">
-            <div className="flex flex-wrap gap-2 text-xs text-slate-300">
-              {recommendedTopics.map((topic) => (
-                <button
-                  key={topic}
-                  type="button"
-                  onClick={() => handleSubmit(topic)}
-                  className="rounded-full bg-slate-800 px-3 py-1 transition hover:bg-indigo-900/60 hover:text-indigo-200"
-                >
-                  {topic}
-                </button>
-              ))}
-            </div>
+            {recommendedTopics.length > 0 ? (
+              <div className="flex flex-wrap gap-2 text-xs text-slate-300">
+                {recommendedTopics.map((topic) => (
+                  <button
+                    key={topic}
+                    type="button"
+                    onClick={() => handleSubmit(topic)}
+                    className="rounded-full bg-slate-800 px-3 py-1 transition hover:bg-indigo-900/60 hover:text-indigo-200"
+                  >
+                    {topic}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400">Topic suggestions will appear as courses are published.</p>
+            )}
           </div>
         </div>
       )}

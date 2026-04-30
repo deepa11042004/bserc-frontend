@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { FiChevronDown, FiClock, FiPlayCircle, FiStar, FiUser } from 'react-icons/fi'
 import { useCart } from '../context/CartContext'
@@ -9,36 +9,74 @@ import CoursePreview from '../components/courseDetails/CoursePreview'
 import WhatYouWillLearn from '../components/courseDetails/WhatYouWillLearn'
 import CourseIncludes from '../components/courseDetails/CourseIncludes'
 import RelatedTopics from '../components/courseDetails/RelatedTopics'
-import { courseDetailsData, footerColumns } from '../data/homeData'
+import { footerColumns } from '../data/homeData'
 import { addPurchasedCourses } from '../utils/purchases'
 import { useAuthState } from '../hooks/useAuth'
+import { publicCourseService } from '../services/publicCourseService'
 
 const CourseDetails = () => {
   const location = useLocation()
   const navigate = useNavigate()
+  const { slug } = useParams()
   const { user } = useAuthState()
-  useParams() // slug not needed for now but kept for future data lookup
 
-  const courseState = location.state?.course || {}
-  const data = {
-    ...courseDetailsData,
-    ...courseState,
-  }
+  const [data, setData] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
 
   const { addToCart } = useCart()
-  const courseId = courseState.courseId || courseState.id || encodeURIComponent((courseState.title || data.title || '').toLowerCase().replace(/\s+/g, '-'))
+
+  useEffect(() => {
+    let active = true
+
+    const loadCourse = async () => {
+      setIsLoading(true)
+
+      try {
+        const fullCourse = await publicCourseService.getCourseFullBySlug(slug)
+        if (!active) return
+
+        setData(fullCourse)
+        setLoadError('')
+      } catch (error) {
+        if (!active) return
+
+        setData(null)
+        setLoadError(error?.message || 'Could not load this course right now.')
+      } finally {
+        if (active) {
+          setIsLoading(false)
+        }
+      }
+    }
+
+    void loadCourse()
+
+    return () => {
+      active = false
+    }
+  }, [slug])
+
+  const courseId = data?.slug || data?.courseId || decodeURIComponent(slug || '')
   const courseForCart = {
     courseId,
-    title: data.title,
-    price: data.price,
-    image: data.videoPreview,
-    instructor: data.instructor,
+    slug: data?.slug,
+    apiCourseId: data?.apiCourseId,
+    title: data?.title,
+    price: data?.price,
+    image: data?.videoPreview || data?.thumbnail,
+    thumbnail: data?.thumbnail,
+    instructor: data?.instructor,
   }
 
-  const courseContent = data.courseContent || []
+  const courseContent = data?.courseContent || []
   const [openSections, setOpenSections] = useState(courseContent.length ? [0] : [])
   const [isExpandedDescription, setIsExpandedDescription] = useState(false)
   const [isExpandedInstructor, setIsExpandedInstructor] = useState(false)
+
+  useEffect(() => {
+    setOpenSections(courseContent.length ? [0] : [])
+  }, [courseContent.length])
 
   const contentStats = useMemo(() => {
     const totalLectures = courseContent.reduce((sum, section) => sum + (section.lectures?.length || 0), 0)
@@ -70,13 +108,13 @@ const CourseDetails = () => {
     setOpenSections((prev) => (prev.length === courseContent.length ? [] : allSectionIndices))
   }
 
-  const descriptionText = data.description || 'Course description coming soon.'
+  const descriptionText = data?.description || 'Course description coming soon.'
   const descriptionPreview = useMemo(() => {
     if (descriptionText.length <= 340) return descriptionText
     return `${descriptionText.slice(0, 340)}...`
   }, [descriptionText])
 
-  const instructorProfile = data.instructorProfile || {}
+  const instructorProfile = data?.instructorProfile || {}
   const instructorBioShort = instructorProfile.bioShort || 'Instructor bio will be updated soon.'
   const instructorBioFull = instructorProfile.bioLong || instructorBioShort
 
@@ -89,6 +127,26 @@ const CourseDetails = () => {
     window.alert('Purchase successful! You can now access the course through My Learning.')
   }
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100">
+        <Navbar />
+        <div className="mx-auto max-w-6xl px-4 py-16 text-slate-300">Loading course details...</div>
+        <Footer columns={footerColumns} />
+      </div>
+    )
+  }
+
+  if (!data) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100">
+        <Navbar />
+        <div className="mx-auto max-w-6xl px-4 py-16 text-slate-300">{loadError || 'Course not found.'}</div>
+        <Footer columns={footerColumns} />
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100">
       <Navbar />
@@ -98,19 +156,19 @@ const CourseDetails = () => {
           <CourseHeader
             title={data.title}
             subtitle={data.subtitle}
-            tags={data.tags}
+            tags={data.tags || []}
             rating={data.rating}
             ratingsCount={data.ratingsCount}
             learners={data.learners}
             lastUpdated={data.lastUpdated}
             language={data.language}
-            captions={data.captions}
+            captions={data.captions || []}
             instructor={data.instructor}
           />
 
-          <WhatYouWillLearn items={data.whatYouWillLearn} />
+          <WhatYouWillLearn items={data.whatYouWillLearn || []} />
 
-          <CourseIncludes items={data.includes} />
+          <CourseIncludes items={data.includes || []} />
 
           <section className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -262,9 +320,9 @@ const CourseDetails = () => {
 
         <div className="w-full lg:w-96">
           <CoursePreview
-            price={data.price}
-            guarantee={data.guarantee}
-            lifetimeAccess={data.lifetimeAccess}
+            price={data.price || 'Free'}
+            guarantee={data.guarantee || 'Course access included'}
+            lifetimeAccess={data.lifetimeAccess ?? true}
             couponApplied={data.couponApplied}
             videoPreview={data.videoPreview}
             onAddToCart={() => addToCart(courseForCart)}

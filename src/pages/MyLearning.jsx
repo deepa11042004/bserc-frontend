@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FiStar, FiTrash2 } from 'react-icons/fi'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { footerColumns } from '../data/homeData'
 import { getPurchasedCourses, removePurchasedCourse } from '../utils/purchases'
+import { publicCourseService } from '../services/publicCourseService'
 
 const tabs = ['All Courses', 'Certificates']
 
@@ -26,6 +27,9 @@ const ProgressBar = ({ progress = 3.5 }) => (
 const MyLearning = () => {
   const [activeTab, setActiveTab] = useState('All Courses')
   const [purchased, setPurchased] = useState(() => getPurchasedCourses())
+  const [courses, setCourses] = useState([])
+  const [loadingCourses, setLoadingCourses] = useState(false)
+  const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
     const sync = () => setPurchased(getPurchasedCourses())
@@ -38,7 +42,32 @@ const MyLearning = () => {
   }, [])
 
   const navigate = useNavigate()
-  const courses = useMemo(() => purchased || [], [purchased])
+  const purchasedCourses = useMemo(() => purchased || [], [purchased])
+
+  const hydrateCourses = useCallback(async (entries) => {
+    if (!entries.length) {
+      setCourses([])
+      setLoadError('')
+      return
+    }
+
+    setLoadingCourses(true)
+
+    try {
+      const hydrated = await publicCourseService.hydratePurchasedCourses(entries)
+      setCourses(hydrated)
+      setLoadError('')
+    } catch (error) {
+      setCourses(entries)
+      setLoadError(error?.message || 'Could not refresh course details right now.')
+    } finally {
+      setLoadingCourses(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void hydrateCourses(purchasedCourses)
+  }, [hydrateCourses, purchasedCourses])
 
   const handleRemove = (courseId) => {
     const updated = removePurchasedCourse(courseId)
@@ -46,7 +75,8 @@ const MyLearning = () => {
   }
 
   const handleViewCourse = (course) => {
-    navigate(`/learn/${encodeURIComponent(course.courseId)}`, { state: { course } })
+    const identifier = course.slug || course.apiCourseId || course.courseId
+    navigate(`/learn/${encodeURIComponent(identifier)}`, { state: { course } })
   }
 
   return (
@@ -75,7 +105,11 @@ const MyLearning = () => {
           </div>
         </header>
 
-        {courses.length === 0 ? (
+        {loadingCourses ? (
+          <div className="rounded-2xl border border-dashed border-indigo-500/40 bg-[#0f172a] p-8 text-center text-slate-300">
+            Loading your enrolled courses...
+          </div>
+        ) : courses.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-indigo-500/40 bg-[#0f172a] p-8 text-center text-slate-300">
             You haven&apos;t enrolled in any courses yet.
           </div>
@@ -83,7 +117,7 @@ const MyLearning = () => {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {courses.map((course) => (
               <button
-                key={course.courseId}
+                key={course.slug || course.apiCourseId || course.courseId}
                 type="button"
                 onClick={() => handleViewCourse(course)}
                 className="group w-full text-left"
@@ -101,7 +135,7 @@ const MyLearning = () => {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation()
-                          handleRemove(course.courseId)
+                          handleRemove(course.slug || course.courseId || course.apiCourseId)
                         }}
                         className="text-xs text-slate-400 transition hover:text-red-300"
                         aria-label="Remove course"
@@ -125,6 +159,10 @@ const MyLearning = () => {
               </button>
             ))}
           </div>
+        )}
+
+        {!loadingCourses && loadError && (
+          <p className="mt-4 text-sm text-amber-300">{loadError}</p>
         )}
       </main>
 

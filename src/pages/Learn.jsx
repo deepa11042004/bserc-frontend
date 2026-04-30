@@ -3,10 +3,21 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { FiChevronDown, FiPlay, FiPause, FiStar, FiDownload, FiCheck, FiClock, FiGlobe, FiLayers, FiUser, FiAward } from 'react-icons/fi'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
-import { courseDetailsData, footerColumns } from '../data/homeData'
+import { footerColumns } from '../data/homeData'
 import { getPurchasedCourses } from '../utils/purchases'
+import { publicCourseService } from '../services/publicCourseService'
+
+const safeDecodeURIComponent = (value = '') => {
+  try {
+    return decodeURIComponent(String(value || ''))
+  } catch {
+    return String(value || '')
+  }
+}
 
 const buildModules = (course) => {
+  if (!course) return []
+
   const fallbackThumb = course.videoPreview
   const modules = course.courseContent || []
   return modules.map((module, moduleIndex) => {
@@ -14,8 +25,8 @@ const buildModules = (course) => {
       id: `${moduleIndex + 1}-${lessonIndex + 1}`,
       title: lecture.title,
       duration: lecture.duration || '3 min',
-      thumbnail:
-        lecture.thumbnail || fallbackThumb || 'https://images.unsplash.com/photo-1451188502541-13943edb6acb?auto=format&fit=crop&w=900&q=80',
+      thumbnail: lecture.thumbnail || fallbackThumb || '',
+      youtubeUrl: lecture.youtubeUrl || '',
       resources: [
         { type: 'pdf', title: 'Notes', link: '#' },
         { type: 'link', title: 'Reference', link: '#' },
@@ -62,23 +73,80 @@ const TabButton = ({ label, active, onClick }) => (
 const Learn = () => {
   const { courseId } = useParams()
   const navigate = useNavigate()
+  const decodedCourseId = safeDecodeURIComponent(courseId)
+  const purchasedCourses = useMemo(() => getPurchasedCourses(), [])
+
+  const purchasedCourse = useMemo(() => {
+    return purchasedCourses.find((course) => {
+      const slug = safeDecodeURIComponent(course.slug || '')
+      const savedId = safeDecodeURIComponent(course.courseId || '')
+      const apiId = course.apiCourseId ? String(course.apiCourseId) : ''
+
+      return slug === decodedCourseId || savedId === decodedCourseId || apiId === decodedCourseId
+    })
+  }, [decodedCourseId, purchasedCourses])
+
+  const [course, setCourse] = useState(null)
+  const [loadingCourse, setLoadingCourse] = useState(true)
+  const [courseError, setCourseError] = useState('')
+
+  const progressKey = useMemo(
+    () => String(course?.slug || course?.apiCourseId || purchasedCourse?.courseId || decodedCourseId || ''),
+    [course?.apiCourseId, course?.slug, purchasedCourse?.courseId, decodedCourseId],
+  )
+
   const [selectedLesson, setSelectedLesson] = useState(null)
-  const [completedLessons, setCompletedLessons] = useState(() => loadCompleted(courseId))
+  const [completedLessons, setCompletedLessons] = useState(() => loadCompleted(progressKey || decodedCourseId))
   const [openModules, setOpenModules] = useState([])
   const [activeTab, setActiveTab] = useState('Course Content')
   const [openResourceLessonId, setOpenResourceLessonId] = useState(null)
   const [isDescExpanded, setIsDescExpanded] = useState(false)
 
-  const purchasedCourses = useMemo(() => getPurchasedCourses(), [])
-  const course = useMemo(() => {
-    const found = purchasedCourses.find((c) => c.courseId === courseId)
-    return { ...courseDetailsData, ...found }
-  }, [courseId, purchasedCourses])
+  useEffect(() => {
+    let active = true
+
+    const loadCourse = async () => {
+      setLoadingCourse(true)
+
+      try {
+        const identifier =
+          purchasedCourse?.slug || purchasedCourse?.apiCourseId || purchasedCourse?.courseId || decodedCourseId
+        const fullCourse = await publicCourseService.getCourseFullByIdentifier(identifier)
+        if (!active) return
+
+        setCourse({
+          ...fullCourse,
+          ...purchasedCourse,
+          courseId: fullCourse.slug || fullCourse.courseId || purchasedCourse?.courseId,
+        })
+        setCourseError('')
+      } catch (error) {
+        if (!active) return
+
+        setCourse(null)
+        setCourseError(error?.message || 'Could not load this course right now.')
+      } finally {
+        if (active) {
+          setLoadingCourse(false)
+        }
+      }
+    }
+
+    void loadCourse()
+
+    return () => {
+      active = false
+    }
+  }, [decodedCourseId, purchasedCourse])
+
+  useEffect(() => {
+    setCompletedLessons(loadCompleted(progressKey || decodedCourseId))
+  }, [progressKey, decodedCourseId])
 
   const modules = useMemo(() => buildModules(course), [course])
 
   const totalMinutes = useMemo(() => {
-    const content = course.courseContent || []
+    const content = course?.courseContent || []
     return content.reduce(
       (sum, section) =>
         sum + (section.lectures || []).reduce((acc, lecture) => acc + (lecture.durationMinutes || 0), 0),
@@ -95,14 +163,8 @@ const Learn = () => {
   }
 
   const formattedDuration = formatDuration(totalMinutes)
-  const level = course.level || 'All levels'
-  const categories = course.categories || course.relatedTopics || []
-
-  useEffect(() => {
-    if (!course || !course.courseId) {
-      navigate('/')
-    }
-  }, [course, navigate])
+  const level = course?.level || 'All levels'
+  const categories = course?.categories || course?.relatedTopics || []
 
   useEffect(() => {
     if (modules.length) {
@@ -120,7 +182,7 @@ const Learn = () => {
     setCompletedLessons((prev) => {
       const exists = prev.includes(lessonId)
       const next = exists ? prev.filter((id) => id !== lessonId) : [...prev, lessonId]
-      saveCompleted(courseId, next)
+      saveCompleted(progressKey || decodedCourseId, next)
       return next
     })
   }
@@ -132,6 +194,35 @@ const Learn = () => {
     )
   }
 
+  if (loadingCourse) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white">
+        <Navbar />
+        <main className="mx-auto mt-6 max-w-6xl px-4 py-8 text-slate-300">Loading course lessons...</main>
+        <Footer columns={footerColumns} />
+      </div>
+    )
+  }
+
+  if (!course) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white">
+        <Navbar />
+        <main className="mx-auto mt-6 max-w-6xl px-4 py-8 text-slate-300">
+          <p>{courseError || 'Course not found.'}</p>
+          <button
+            type="button"
+            onClick={() => navigate('/my-learning')}
+            className="mt-4 rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-100 transition hover:border-indigo-500"
+          >
+            Back to My Learning
+          </button>
+        </main>
+        <Footer columns={footerColumns} />
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-white">
       <Navbar />
@@ -139,13 +230,17 @@ const Learn = () => {
         <section className="space-y-4">
           <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-lg">
             {selectedLesson ? (
-              <img
-                key={selectedLesson.id}
-                src={selectedLesson.thumbnail}
-                alt={selectedLesson.title}
-                className="w-full object-cover transition duration-300"
-                style={{ aspectRatio: '16 / 7' }}
-              />
+              selectedLesson.thumbnail ? (
+                <img
+                  key={selectedLesson.id}
+                  src={selectedLesson.thumbnail}
+                  alt={selectedLesson.title}
+                  className="w-full object-cover transition duration-300"
+                  style={{ aspectRatio: '16 / 7' }}
+                />
+              ) : (
+                <div className="w-full bg-slate-800" style={{ aspectRatio: '16 / 7' }} />
+              )
             ) : (
               <div className="w-full bg-slate-800" style={{ aspectRatio: '16 / 7' }} />
             )}

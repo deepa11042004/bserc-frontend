@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ExploreDropdown from './ExploreDropdown'
-import { exploreMenuData, courseDetailsData } from '../data/homeData'
+import { exploreMenuData } from '../data/homeData'
 
 const ExploreMenu = () => {
   const [isExploreOpen, setIsExploreOpen] = useState(false)
@@ -18,15 +18,7 @@ const ExploreMenu = () => {
   }
 
   const handleChildClick = (categoryLabel, childLabel) => {
-    const slug = encodeURIComponent(childLabel.toLowerCase().replace(/\s+/g, '-'))
-    const course = {
-      title: childLabel,
-      instructor: categoryLabel,
-      rating: courseDetailsData.rating,
-      price: courseDetailsData.price,
-      image: courseDetailsData.videoPreview,
-    }
-    navigate(`/course/${slug}`, { state: { course } })
+    navigate(`/search?q=${encodeURIComponent(childLabel)}&category=${encodeURIComponent(categoryLabel)}`)
     setIsExploreOpen(false)
   }
 
