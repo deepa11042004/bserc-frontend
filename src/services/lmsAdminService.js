@@ -124,6 +124,8 @@ const SEED_STATE = {
       email: 'superadmin@bserc.in',
       designation: 'Platform Lead',
       notificationsEmail: 'superadmin@bserc.in',
+      bio: '',
+      description: '',
     },
     storage: {
       provider: 'Blob Storage',
@@ -847,6 +849,107 @@ const upsertAccessEntries = (entries, payloadEntries) => {
   return next
 }
 
+const normalizeDashboardProfileSettings = (profile = {}) => ({
+  displayName: normalizeText(profile.displayName || profile.display_name || profile.full_name || ''),
+  email: normalizeText(profile.email || profile.primaryEmail || profile.primary_email || ''),
+  designation: normalizeText(profile.designation || ''),
+  notificationsEmail: normalizeText(
+    profile.notificationsEmail || profile.alternativeEmail || profile.alternative_email || '',
+  ),
+  bio: normalizeText(profile.bio || ''),
+  description: normalizeText(profile.description || profile.profile_description || ''),
+})
+
+const fetchDashboardProfileFromApi = async () => {
+  const token = getToken()
+
+  if (!token) {
+    return {
+      ok: false,
+      profile: null,
+      message: 'Authentication token missing.',
+    }
+  }
+
+  const response = await tryFetchJson('/auth/instructor-profile', {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      profile: null,
+      message: response.payload?.message || 'Could not load profile from database.',
+    }
+  }
+
+  return {
+    ok: true,
+    profile: normalizeDashboardProfileSettings(response.payload?.profile || {}),
+    message: '',
+  }
+}
+
+const saveDashboardProfileToApi = async (profilePayload = {}) => {
+  const token = getToken()
+
+  if (!token) {
+    throw new Error('Authentication token missing. Please login again.')
+  }
+
+  const response = await tryFetchJson('/auth/instructor-profile', {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      displayName: normalizeText(profilePayload.displayName),
+      email: normalizeText(profilePayload.email),
+      designation: normalizeText(profilePayload.designation),
+      alternativeEmail: normalizeText(profilePayload.notificationsEmail),
+      bio: normalizeText(profilePayload.bio),
+      description: normalizeText(profilePayload.description),
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(response, 'Could not update instructor profile.'))
+  }
+
+  return normalizeDashboardProfileSettings(response.payload?.profile || {})
+}
+
+const getAssignableInstructors = async () => {
+  const token = getToken()
+
+  if (!token) {
+    throw new Error('Authentication token missing. Please login again.')
+  }
+
+  const response = await tryFetchJson('/auth/instructors', {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(response, 'Could not fetch instructor ids.'))
+  }
+
+  const raw = asArray(response.payload, ['instructors', 'data', 'results'])
+
+  return raw
+    .map((item) => ({
+      id: toInt(item.id),
+      fullName: normalizeText(item.full_name || item.fullName),
+      email: normalizeText(item.email),
+    }))
+    .filter((item) => Number.isInteger(item.id) && item.id > 0)
+}
+
 const createWorkshop = async (payload) => {
   await delay(80)
 
@@ -1526,15 +1629,26 @@ const updateSettings = async (section, payload) => {
     throw new Error('Invalid settings section.')
   }
 
+  let nextSectionState = {
+    ...state.settings[section],
+    ...payload,
+  }
+
+  if (section === 'profile') {
+    const savedProfile = await saveDashboardProfileToApi(payload)
+    nextSectionState = {
+      ...state.settings.profile,
+      ...payload,
+      ...savedProfile,
+    }
+  }
+
   const next = withActivity(
     {
       ...state,
       settings: {
         ...state.settings,
-        [section]: {
-          ...state.settings[section],
-          ...payload,
-        },
+        [section]: nextSectionState,
       },
     },
     {
@@ -1555,6 +1669,20 @@ const getDashboardSnapshot = async () => {
     state = writeState(syncResult.state)
   }
 
+  const profileSync = await fetchDashboardProfileFromApi()
+  if (profileSync.ok && profileSync.profile) {
+    state = writeState({
+      ...state,
+      settings: {
+        ...state.settings,
+        profile: {
+          ...state.settings.profile,
+          ...profileSync.profile,
+        },
+      },
+    })
+  }
+
   const liveWorkshops = await getLiveWorkshops()
   const metrics = getDashboardMetrics(state)
   const analytics = getAnalytics(state)
@@ -1568,11 +1696,16 @@ const getDashboardSnapshot = async () => {
       ok: syncResult.ok,
       message: syncResult.message || '',
     },
+    profileSync: {
+      ok: profileSync.ok,
+      message: profileSync.message || '',
+    },
   }
 }
 
 export const lmsAdminService = {
   getDashboardSnapshot,
+  getAssignableInstructors,
   getLiveWorkshops,
   getSourceParticipants,
   getCourseBuilderModules,

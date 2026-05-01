@@ -7,13 +7,14 @@ const SuperAdminSidebar = ({
   onLogout,
   isOpen,
   onClose,
+  panelTitle = 'Super Admin',
 }) => {
   const panel = (
     <aside className="flex h-full w-72 flex-col border-r border-[#1F1F23] bg-[#0F0F12] lg:fixed lg:top-0 lg:left-0 lg:h-screen">
       <div className="flex h-16 items-center justify-between border-b border-[#1F1F23] px-5">
         <div>
           <div className="text-[11px] uppercase tracking-[0.16em] text-slate-400">BSERC LMS</div>
-          <div className="text-sm font-semibold text-white">Super Admin</div>
+          <div className="text-sm font-semibold text-white">{panelTitle}</div>
         </div>
 
         <button
@@ -101,7 +102,7 @@ const SuperAdminSidebar = ({
         <button
           type="button"
           onClick={onLogout}
-          class="w-full rounded-md border border-red-500 bg-red-600 px-3 py-2 text-sm font-medium text-white transition duration-200 hover:bg-red-700 hover:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-400"
+          className="w-full rounded-md border border-red-500 bg-red-600 px-3 py-2 text-sm font-medium text-white transition duration-200 hover:bg-red-700 hover:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-400"
         >
           Logout
         </button>

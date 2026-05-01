@@ -238,9 +238,37 @@ const buildCourseIncludes = ({ totalDurationMinutes, lessonCount, lifetimeAccess
   return includes
 }
 
+const makeShortBio = (shortBio = '', longBio = '') => {
+  const normalizedShort = normalizeText(shortBio)
+  if (normalizedShort) return normalizedShort
+
+  const normalizedLong = normalizeText(longBio)
+  if (!normalizedLong) return ''
+  if (normalizedLong.length <= 180) return normalizedLong
+
+  return `${normalizedLong.slice(0, 177)}...`
+}
+
 const normalizeCourseFull = (course = {}) => {
   const summary = normalizeCourseSummary(course)
   const modules = asArray(course.modules).map((module) => normalizeModule(module, summary.thumbnailUrl))
+  const rawInstructorProfile = course.instructor_profile || course.instructorProfile || {}
+
+  const instructorName =
+    normalizeText(rawInstructorProfile.name || rawInstructorProfile.display_name) || summary.instructor
+
+  const instructorDesignation =
+    normalizeText(rawInstructorProfile.designation || rawInstructorProfile.title)
+    || (summary.instructorId ? `Instructor #${summary.instructorId}` : 'Instructor')
+
+  const instructorDescription = normalizeText(
+    rawInstructorProfile.description || rawInstructorProfile.profile_description,
+  )
+
+  const instructorShortBio = makeShortBio(
+    rawInstructorProfile.short_bio || rawInstructorProfile.bio,
+    instructorDescription,
+  )
 
   const lessonCount = modules.reduce((sum, module) => sum + (module.lessons || []).length, 0)
 
@@ -267,6 +295,7 @@ const normalizeCourseFull = (course = {}) => {
 
   return {
     ...summary,
+    instructor: instructorName,
     price: summary.price,
     guarantee: summary.isPaid ? '30-day money-back guarantee' : 'Free course access',
     videoPreview: summary.thumbnailUrl,
@@ -287,14 +316,15 @@ const normalizeCourseFull = (course = {}) => {
     totalDurationMinutes,
     lastUpdated: summary.lastUpdated,
     instructorProfile: {
-      name: summary.instructor,
-      title: summary.instructorId ? `Instructor #${summary.instructorId}` : 'Instructor',
+      id: toNullableInt(rawInstructorProfile.id) || summary.instructorId,
+      name: instructorName,
+      title: instructorDesignation,
       rating: summary.rating,
       reviews: summary.ratingsCount,
       students: `${summary.students} students`,
       courses: '—',
-      bioShort: '',
-      bioLong: '',
+      bioShort: instructorShortBio,
+      bioLong: instructorDescription || instructorShortBio,
       profileUrl: '#',
     },
   }

@@ -25,6 +25,7 @@ import {
 import SuperAdminSidebar from '../../components/superAdmin/SuperAdminSidebar'
 import SuperAdminTopbar from '../../components/superAdmin/SuperAdminTopbar'
 import SuperAdminMetricCard from '../../components/superAdmin/SuperAdminMetricCard'
+import ProfileAvatar from '../../components/superAdmin/ProfileAvatar'
 import { lmsAdminService } from '../../services/lmsAdminService'
 import { useAuthState } from '../../hooks/useAuth'
 import { logoutAdmin } from '../../utils/auth'
@@ -103,6 +104,8 @@ const INITIAL_SNAPSHOT = {
       email: '',
       designation: '',
       notificationsEmail: '',
+      bio: '',
+      description: '',
     },
     storage: {
       provider: 'Blob Storage',
@@ -198,11 +201,39 @@ const slugifyWorkshop = (value = '') =>
 
 const sleep = (ms = 200) => new Promise((resolve) => setTimeout(resolve, ms))
 
+const isValidEmail = (value = '') => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).trim())
+
+const validateProfileSettings = (profile = {}) => {
+  const displayName = String(profile.displayName || '').trim()
+  const email = String(profile.email || '').trim()
+  const designation = String(profile.designation || '').trim()
+  const alternativeEmail = String(profile.notificationsEmail || '').trim()
+
+  if (!displayName) return 'Display Name is required.'
+  if (!email) return 'Primary Email is required.'
+  if (!isValidEmail(email)) return 'Primary Email must be a valid email address.'
+  if (!designation) return 'Designation is required.'
+  if (!alternativeEmail) return 'Alternative Email is required.'
+  if (!isValidEmail(alternativeEmail)) return 'Alternative Email must be a valid email address.'
+
+  return ''
+}
+
 const SuperAdminDashboard = () => {
   const navigate = useNavigate()
   const { user } = useAuthState()
+  const isInstructorAdmin = user?.role === 'instructor'
+  const currentInstructorId = Number.parseInt(String(user?.id ?? user?.userId ?? ''), 10)
+  const panelTitle =
+    isInstructorAdmin && Number.isInteger(currentInstructorId) && currentInstructorId > 0
+      ? `Instructor Panel (ID: ${currentInstructorId})`
+      : isInstructorAdmin
+        ? 'Instructor Panel'
+        : 'Super Admin Panel'
 
-  const [activeSection, setActiveSection] = useState(SECTION_IDS.OVERVIEW)
+  const [activeSection, setActiveSection] = useState(() =>
+    isInstructorAdmin ? SECTION_IDS.ALL_WORKSHOPS : SECTION_IDS.OVERVIEW,
+  )
   const [selectedWorkshopForBuilder, setSelectedWorkshopForBuilder] = useState(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -216,6 +247,8 @@ const SuperAdminDashboard = () => {
   const [workshopSlugEdited, setWorkshopSlugEdited] = useState(false)
   const [workshopSearch, setWorkshopSearch] = useState('')
   const [workshopStatusFilter, setWorkshopStatusFilter] = useState('all')
+  const [assignableInstructors, setAssignableInstructors] = useState([])
+  const [instructorsLoading, setInstructorsLoading] = useState(false)
 
   const [moduleWorkshopId, setModuleWorkshopId] = useState('')
   const [selectedModuleId, setSelectedModuleId] = useState('')
@@ -298,6 +331,58 @@ const SuperAdminDashboard = () => {
   }, [snapshot.workshops])
 
   useEffect(() => {
+    if (!isInstructorAdmin) return
+
+    if (!Number.isInteger(currentInstructorId) || currentInstructorId <= 0) return
+
+    setWorkshopForm((prev) => {
+      const nextId = String(currentInstructorId)
+      if (String(prev.instructorId || '') === nextId) return prev
+      return { ...prev, instructorId: nextId }
+    })
+  }, [currentInstructorId, isInstructorAdmin])
+
+  useEffect(() => {
+    if (isInstructorAdmin) {
+      setAssignableInstructors([])
+      setInstructorsLoading(false)
+      return
+    }
+
+    let active = true
+
+    const loadAssignableInstructors = async () => {
+      setInstructorsLoading(true)
+      try {
+        const rows = await lmsAdminService.getAssignableInstructors()
+        if (!active) return
+
+        setAssignableInstructors(rows)
+        setWorkshopForm((prev) => {
+          const validCurrent = rows.some((row) => String(row.id) === String(prev.instructorId || ''))
+          if (validCurrent) return prev
+
+          const fallback = rows[0]?.id ? String(rows[0].id) : ''
+          return { ...prev, instructorId: fallback }
+        })
+      } catch (err) {
+        if (!active) return
+        console.error(err)
+        setAssignableInstructors([])
+        setError(err?.message || 'Could not load instructor ids.')
+      } finally {
+        if (active) setInstructorsLoading(false)
+      }
+    }
+
+    void loadAssignableInstructors()
+
+    return () => {
+      active = false
+    }
+  }, [isInstructorAdmin])
+
+  useEffect(() => {
     if (!moduleWorkshopId) {
       setSelectedModuleId('')
       return
@@ -361,7 +446,7 @@ const SuperAdminDashboard = () => {
     return () => URL.revokeObjectURL(preview)
   }, [uploadForm.thumbnailFile])
 
-  const sidebarSections = useMemo(
+  const baseSidebarSections = useMemo(
     () => [
       {
         title: 'Dashboard',
@@ -512,26 +597,79 @@ const SuperAdminDashboard = () => {
     [snapshot.workshops.length, snapshot.uploadJobs],
   )
 
+  const sidebarSections = useMemo(() => {
+    if (!isInstructorAdmin) return baseSidebarSections
+
+    const contentSection = baseSidebarSections.find((section) => section.title === 'Content Management')
+    const allCoursesItem = contentSection?.items?.find((item) => item.id === SECTION_IDS.ALL_WORKSHOPS)
+    const settingsSection = baseSidebarSections.find((section) => section.title === 'System / Settings')
+    const profileItem = settingsSection?.items?.find((item) => item.id === SECTION_IDS.ADMIN_PROFILE)
+
+    const instructorSections = []
+
+    if (profileItem) {
+      instructorSections.push({
+        title: 'Account',
+        collapsible: true,
+        items: [{ ...profileItem, label: 'Profile' }],
+      })
+    }
+
+    if (allCoursesItem) {
+      instructorSections.push({
+        title: 'Content Management',
+        collapsible: true,
+        items: [allCoursesItem],
+      })
+    }
+
+    return instructorSections
+  }, [baseSidebarSections, isInstructorAdmin])
+
+  useEffect(() => {
+    if (!sidebarSections.length) return
+
+    const allowedIds = new Set(
+      sidebarSections.flatMap((section) => section.items?.map((item) => item.id) || []),
+    )
+
+    // Create Course is launched from a button inside All Courses, not from sidebar.
+    if (allowedIds.has(SECTION_IDS.ALL_WORKSHOPS)) {
+      allowedIds.add(SECTION_IDS.CREATE_WORKSHOP)
+    }
+
+    if (allowedIds.has(activeSection)) return
+
+    setActiveSection(isInstructorAdmin ? SECTION_IDS.ALL_WORKSHOPS : SECTION_IDS.OVERVIEW)
+  }, [activeSection, isInstructorAdmin, sidebarSections])
+
   const allMenuItems = useMemo(
     () => sidebarSections.flatMap((section) => section.items),
     [sidebarSections],
   )
 
-  const activeSectionMeta = useMemo(
-    () => allMenuItems.find((item) => item.id === activeSection) || allMenuItems[0],
-    [activeSection, allMenuItems],
-  )
+  const activeSectionMeta = useMemo(() => {
+    if (activeSection === SECTION_IDS.CREATE_WORKSHOP) {
+      return {
+        id: SECTION_IDS.CREATE_WORKSHOP,
+        label: 'Create Course',
+      }
+    }
+
+    return allMenuItems.find((item) => item.id === activeSection) || allMenuItems[0]
+  }, [activeSection, allMenuItems])
 
   const visibleSection = useMemo(() => {
-    if ([SECTION_IDS.ALL_WORKSHOPS, SECTION_IDS.CREATE_WORKSHOP].includes(activeSection)) return SECTION_IDS.WORKSHOPS
-    if ([SECTION_IDS.UPLOAD_CENTER, SECTION_IDS.UPLOAD_PROGRESS, SECTION_IDS.MEDIA_LIBRARY].includes(activeSection)) return SECTION_IDS.UPLOAD
-    if ([SECTION_IDS.ALL_STUDENTS, SECTION_IDS.ENROLLED_STUDENTS, SECTION_IDS.GRANT_ACCESS, SECTION_IDS.REVOKE_ACCESS].includes(activeSection)) return SECTION_IDS.ACCESS
-    if ([SECTION_IDS.ANALYTICS_OVERVIEW, SECTION_IDS.WORKSHOP_PERFORMANCE, SECTION_IDS.VIDEO_ENGAGEMENT].includes(activeSection)) return SECTION_IDS.ANALYTICS
-    if ([SECTION_IDS.ANNOUNCEMENTS, SECTION_IDS.NOTIFICATIONS].includes(activeSection)) return 'communication'
-    if ([SECTION_IDS.ADMIN_PROFILE, SECTION_IDS.PLATFORM_SETTINGS, SECTION_IDS.PERMISSIONS].includes(activeSection)) return SECTION_IDS.SETTINGS
-    if ([SECTION_IDS.HELP_DESK, SECTION_IDS.FAQ_MANAGEMENT].includes(activeSection)) return 'support'
-    return SECTION_IDS.OVERVIEW
-  }, [activeSection])
+    if (activeSection === SECTION_IDS.CREATE_WORKSHOP) return SECTION_IDS.CREATE_WORKSHOP;
+    if (activeSection === SECTION_IDS.ALL_WORKSHOPS) return SECTION_IDS.WORKSHOPS;
+    if ([SECTION_IDS.UPLOAD_CENTER, SECTION_IDS.UPLOAD_PROGRESS, SECTION_IDS.MEDIA_LIBRARY].includes(activeSection)) return SECTION_IDS.UPLOAD;
+    if ([SECTION_IDS.ALL_STUDENTS, SECTION_IDS.ENROLLED_STUDENTS, SECTION_IDS.GRANT_ACCESS, SECTION_IDS.REVOKE_ACCESS].includes(activeSection)) return SECTION_IDS.ACCESS;
+    if ([SECTION_IDS.ANALYTICS_OVERVIEW, SECTION_IDS.WORKSHOP_PERFORMANCE, SECTION_IDS.VIDEO_ENGAGEMENT].includes(activeSection)) return SECTION_IDS.ANALYTICS;
+    if ([SECTION_IDS.ANNOUNCEMENTS, SECTION_IDS.NOTIFICATIONS].includes(activeSection)) return 'communication';
+    if ([SECTION_IDS.ADMIN_PROFILE, SECTION_IDS.PLATFORM_SETTINGS, SECTION_IDS.PERMISSIONS].includes(activeSection)) return SECTION_IDS.SETTINGS;
+    if ([SECTION_IDS.HELP_DESK, SECTION_IDS.FAQ_MANAGEMENT].includes(activeSection)) return 'support';
+    return SECTION_IDS.OVERVIEW;
+  }, [activeSection]);
 
   const selectedModuleWorkshop = useMemo(
     () => snapshot.workshops.find((workshop) => workshop.id === moduleWorkshopId) || null,
@@ -1005,8 +1143,17 @@ const SuperAdminDashboard = () => {
   }
 
   const handleSaveSettings = async (section) => {
-    setBusy(true)
     setError('')
+
+    if (section === 'profile') {
+      const validationError = validateProfileSettings(settingsDraft.profile)
+      if (validationError) {
+        setError(validationError)
+        return
+      }
+    }
+
+    setBusy(true)
 
     try {
       await lmsAdminService.updateSettings(section, settingsDraft[section])
@@ -1376,16 +1523,42 @@ const SuperAdminDashboard = () => {
 
               <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
                 Instructor ID
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={workshopForm.instructorId}
-                  onChange={(event) => setWorkshopForm((prev) => ({ ...prev, instructorId: event.target.value }))}
-                  placeholder="e.g. 12"
-                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
-                  required
-                />
+                {isInstructorAdmin ? (
+                  <>
+                    <input
+                      type="text"
+                      value={workshopForm.instructorId}
+                      readOnly
+                      className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-slate-200 outline-none"
+                      required
+                    />
+                    <div className="mt-1 text-[11px] normal-case tracking-normal text-slate-500">
+                      Auto-selected from your account id.
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <select
+                      value={workshopForm.instructorId}
+                      onChange={(event) => setWorkshopForm((prev) => ({ ...prev, instructorId: event.target.value }))}
+                      className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                      required
+                      disabled={instructorsLoading || !assignableInstructors.length}
+                    >
+                      {!assignableInstructors.length && (
+                        <option value="">{instructorsLoading ? 'Loading instructors...' : 'No instructors available'}</option>
+                      )}
+                      {assignableInstructors.map((instructor) => (
+                        <option key={instructor.id} value={String(instructor.id)}>
+                          {`${instructor.id} - ${instructor.fullName || 'Unnamed Instructor'}${instructor.email ? ` (${instructor.email})` : ''}`}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="mt-1 text-[11px] normal-case tracking-normal text-slate-500">
+                      Select an instructor id from active instructor accounts.
+                    </div>
+                  </>
+                )}
               </label>
             </div>
 
@@ -2218,71 +2391,163 @@ const SuperAdminDashboard = () => {
     </section>
   )
 
+
   const renderSettings = () => (
-    <section className="grid gap-4 xl:grid-cols-3">
-      <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Admin Profile</h2>
+    <section className="space-y-6">
+      {/* <div className="rounded-3xl border border-[#111827] bg-[#0b1123] p-6"> */}
+        {/* <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"> */}
+          {/* <div> */}
+            {/* <h2 className="text-2xl font-semibold text-slate-100">{isInstructorAdmin ? 'Instructor Profile' : 'Admin Profile'}</h2> */}
+            {/* <p className="mt-2 max-w-2xl text-sm text-slate-400">Update your instructor profile with a professional bio, clear description, and the correct notification email. This section now spans the full width of the admin page.</p> */}
+          {/* </div> */}
+          {/* <div className="rounded-2xl bg-[#111827] px-4 py-2 text-sm text-slate-300">Profile section</div> */}
+        {/* </div> */}
+      {/* </div> */}
 
-        <div className="space-y-2">
-          <input
-            type="text"
-            value={settingsDraft.profile.displayName}
-            onChange={(event) =>
-              setSettingsDraft((prev) => ({
-                ...prev,
-                profile: { ...prev.profile, displayName: event.target.value },
-              }))
-            }
-            placeholder="Display name"
-            className="w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
-          />
-          <input
-            type="email"
-            value={settingsDraft.profile.email}
-            onChange={(event) =>
-              setSettingsDraft((prev) => ({
-                ...prev,
-                profile: { ...prev.profile, email: event.target.value },
-              }))
-            }
-            placeholder="Primary email"
-            className="w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
-          />
-          <input
-            type="text"
-            value={settingsDraft.profile.designation}
-            onChange={(event) =>
-              setSettingsDraft((prev) => ({
-                ...prev,
-                profile: { ...prev.profile, designation: event.target.value },
-              }))
-            }
-            placeholder="Designation"
-            className="w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
-          />
-          <input
-            type="email"
-            value={settingsDraft.profile.notificationsEmail}
-            onChange={(event) =>
-              setSettingsDraft((prev) => ({
-                ...prev,
-                profile: { ...prev.profile, notificationsEmail: event.target.value },
-              }))
-            }
-            placeholder="Notifications email"
-            className="w-full rounded-md border border-[#2B2B30] bg-[#0F0F12] px-3 py-2 text-sm text-white outline-none"
-          />
+      <div className="rounded-3xl border border-[#1F1F23] bg-[#09090c] p-6 shadow-[0_20px_60px_-40px_rgba(14,165,233,0.35)]">
+        <div className="grid gap-6 lg:grid-cols-[260px_1fr] items-start">
+          <div className="rounded-3xl border border-slate-800 bg-[#0f172a] p-5 text-center">
+            <ProfileAvatar name={settingsDraft.profile.displayName} size={82} />
+            <div className="mt-4">
+              <div className="text-sm font-semibold text-slate-200">{settingsDraft.profile.displayName || 'Instructor name'}</div>
+              <div className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">
+                {settingsDraft.profile.designation || 'Designation'}
+              </div>
+            </div>
+            <p className="mt-4 text-sm leading-6 text-slate-400">
+              Add a short bio and a longer description to make your instructor profile feel complete and professional.
+            </p>
+            <div className="mt-5 space-y-2 rounded-2xl border border-slate-800 bg-[#111827] p-4 text-left text-xs text-slate-400">
+              <div className="font-semibold text-slate-200">Profile tips</div>
+              <div>• Keep the bio concise and learner focused.</div>
+              <div>• Use description to share your teaching strengths and course style.</div>
+              <div>• Update emails if you want notifications delivered to a different address.</div>
+            </div>
+          </div>
+
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-100">{isInstructorAdmin ? 'Instructor Profile' : 'Admin Profile'}</h2>
+              <p className="mt-1 text-sm text-slate-400">Use these fields to personalize the instructor experience and keep your account details accurate.</p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block text-sm text-slate-200">
+                Full Name <span className="text-rose-400">*</span>
+                <input
+                  type="text"
+                  required
+                  value={settingsDraft.profile.displayName}
+                  onChange={(event) =>
+                    setSettingsDraft((prev) => ({
+                      ...prev,
+                      profile: { ...prev.profile, displayName: event.target.value },
+                    }))
+                  }
+                  placeholder="Display name"
+                  className="mt-2 w-full rounded-2xl border border-slate-800 bg-[#0f172a] px-4 py-3 text-sm text-white outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                />
+              </label>
+
+              <label className="block text-sm text-slate-200">
+                Primary Email <span className="text-rose-400">*</span>
+                <input
+                  type="email"
+                  required
+                  value={settingsDraft.profile.email}
+                  onChange={(event) =>
+                    setSettingsDraft((prev) => ({
+                      ...prev,
+                      profile: { ...prev.profile, email: event.target.value },
+                    }))
+                  }
+                  placeholder="Primary email"
+                  className="mt-2 w-full rounded-2xl border border-slate-800 bg-[#0f172a] px-4 py-3 text-sm text-white outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                />
+              </label>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block text-sm text-slate-200">
+                Designation <span className="text-rose-400">*</span>
+                <input
+                  type="text"
+                  required
+                  value={settingsDraft.profile.designation}
+                  onChange={(event) =>
+                    setSettingsDraft((prev) => ({
+                      ...prev,
+                      profile: { ...prev.profile, designation: event.target.value },
+                    }))
+                  }
+                  placeholder="Title or role"
+                  className="mt-2 w-full rounded-2xl border border-slate-800 bg-[#0f172a] px-4 py-3 text-sm text-white outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                />
+              </label>
+
+              <label className="block text-sm text-slate-200">
+                Alternative Email <span className="text-rose-400">*</span>
+                <input
+                  type="email"
+                  required
+                  value={settingsDraft.profile.notificationsEmail}
+                  onChange={(event) =>
+                    setSettingsDraft((prev) => ({
+                      ...prev,
+                      profile: { ...prev.profile, notificationsEmail: event.target.value },
+                    }))
+                  }
+                  placeholder="Alternative email"
+                  className="mt-2 w-full rounded-2xl border border-slate-800 bg-[#0f172a] px-4 py-3 text-sm text-white outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+                />
+              </label>
+            </div>
+
+            <label className="block text-sm text-slate-200">
+              Short Bio
+              <textarea
+                rows={3}
+                value={settingsDraft.profile.bio}
+                onChange={(event) =>
+                  setSettingsDraft((prev) => ({
+                    ...prev,
+                    profile: { ...prev.profile, bio: event.target.value },
+                  }))
+                }
+                placeholder="Write a short bio that explains your teaching style..."
+                className="mt-2 w-full rounded-2xl border border-slate-800 bg-[#0f172a] px-4 py-3 text-sm text-white outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+              />
+            </label>
+
+            <label className="block text-sm text-slate-200">
+              Profile Description
+              <textarea
+                rows={5}
+                value={settingsDraft.profile.description}
+                onChange={(event) =>
+                  setSettingsDraft((prev) => ({
+                    ...prev,
+                    profile: { ...prev.profile, description: event.target.value },
+                  }))
+                }
+                placeholder="Describe your course strengths, expertise, and what learners can expect."
+                className="mt-2 w-full rounded-2xl border border-slate-800 bg-[#0f172a] px-4 py-3 text-sm text-white outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20"
+              />
+            </label>
+
+            <button
+              type="button"
+              onClick={() => handleSaveSettings('profile')}
+              disabled={busy}
+              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-70 shadow-lg shadow-sky-500/20"
+            >
+              <CheckCircle2 className="h-5 w-5" /> Save Profile
+            </button>
+          </div>
         </div>
-
-        <button
-          type="button"
-          onClick={() => handleSaveSettings('profile')}
-          className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-[#2B2B30] px-3 py-2 text-sm text-slate-100 transition hover:bg-[#1A1A1F]"
-        >
-          <CheckCircle2 className="h-4 w-4" /> Save profile
-        </button>
       </div>
 
+      {activeSection !== SECTION_IDS.ADMIN_PROFILE && !isInstructorAdmin && (
       <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Media Storage</h2>
 
@@ -2344,7 +2609,9 @@ const SuperAdminDashboard = () => {
           <CheckCircle2 className="h-4 w-4" /> Save storage
         </button>
       </div>
+      )}
 
+      {activeSection !== SECTION_IDS.ADMIN_PROFILE && !isInstructorAdmin && (
       <div className="rounded-xl border border-[#1F1F23] bg-[#111115] p-4">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-[0.14em] text-slate-300">Permissions</h2>
 
@@ -2400,25 +2667,27 @@ const SuperAdminDashboard = () => {
           <CheckCircle2 className="h-4 w-4" /> Save permissions
         </button>
       </div>
+      )}
     </section>
   )
 
   const renderSection = () => {
-    if (visibleSection === SECTION_IDS.WORKSHOPS) return renderWorkshops()
-    if (visibleSection === SECTION_IDS.MODULES) return renderModules()
-    if (visibleSection === SECTION_IDS.UPLOAD) return renderUploadCenter()
-    if (visibleSection === SECTION_IDS.ACCESS) return renderAccessControl()
-    if (visibleSection === SECTION_IDS.ANALYTICS) return renderAnalytics()
-    if (visibleSection === SECTION_IDS.SETTINGS) return renderSettings()
-    if (visibleSection === 'communication') return renderCommunication()
-    if (visibleSection === 'support') return renderSupport()
-    return renderOverview()
+    if (visibleSection === SECTION_IDS.CREATE_WORKSHOP) return renderCreateWorkshop();
+    if (visibleSection === SECTION_IDS.WORKSHOPS) return renderAllWorkshops();
+    if (visibleSection === SECTION_IDS.MODULES) return renderModules();
+    if (visibleSection === SECTION_IDS.UPLOAD) return renderUploadCenter();
+    if (visibleSection === SECTION_IDS.ACCESS) return renderAccessControl();
+    if (visibleSection === SECTION_IDS.ANALYTICS) return renderAnalytics();
+    if (visibleSection === SECTION_IDS.SETTINGS) return renderSettings();
+    if (visibleSection === 'communication') return renderCommunication();
+    if (visibleSection === 'support') return renderSupport();
+    return renderOverview();
   }
 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-950 text-slate-200">
-        Loading super admin dashboard...
+        {isInstructorAdmin ? 'Loading instructor dashboard...' : 'Loading super admin dashboard...'}
       </div>
     )
   }
@@ -2433,15 +2702,16 @@ const SuperAdminDashboard = () => {
           onLogout={handleLogout}
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
+          panelTitle={panelTitle}
         />
 
         <div className="flex min-h-screen flex-1 flex-col lg:pl-72">
           <SuperAdminTopbar
-            title={activeSectionMeta?.label || 'Super Admin Dashboard'}
+            title={activeSectionMeta?.label || `${isInstructorAdmin ? 'Instructor' : 'Super Admin'} Dashboard`}
             subtitle="Recorded courses LMS control panel"
             onMenuClick={() => setIsSidebarOpen(true)}
             notifications={snapshot.uploadJobs.filter((job) => job.status === 'uploading' || job.status === 'queued').length}
-            userName={user?.name || user?.email || 'Super Admin'}
+            userName={user?.name || user?.email || (isInstructorAdmin ? 'Instructor' : 'Super Admin')}
             onLogout={handleLogout}
           />
 

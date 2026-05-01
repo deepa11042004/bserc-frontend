@@ -1,10 +1,6 @@
 import { FaFacebookF, FaInstagram, FaTwitter, FaLinkedinIn } from 'react-icons/fa'
 import { FiMapPin, FiPhone, FiMail } from 'react-icons/fi'
 import logo from '../assets/logo.png'
-import ministryLogo from '../assets/Ministry_of_Education_India.svg.png'
-import drdoLogo from '../assets/Defence_Research_and_Development_Organisation.svg.png'
-import isroLogo from '../assets/Indian_Space_Research_Organisation_Logo.svg.png'
-import iitDelhiLogo from '../assets/Indian_Institute_of_Technology_Delhi_Logo.svg.png'
 
 const socialLinks = [
   { icon: FaFacebookF, label: 'Facebook', href: '#' },
@@ -40,7 +36,7 @@ const Footer = () => {
                 <p className="text-xs tracking-[0.2em] text-slate-400">HUB FOR SPACE EDUCATION</p>
               </div>
             </div>
-            <div className="mt-2 flex items-center gap-3">
+            {/* <div className="mt-2 flex items-center gap-3">
               {[
                 { src: ministryLogo, alt: 'Partner logo', style: { filter: 'brightness(0) invert(1)' } },
                 { src: drdoLogo, alt: 'Partner logo' },
@@ -59,7 +55,7 @@ const Footer = () => {
                   />
                 </div>
               ))}
-            </div>
+            </div> */}
             <p className="text-sm text-slate-300 leading-relaxed">
               Empowering Future Innovators in Space Exploration. We are dedicated to advancing space
               science education and fostering innovation across India.
