@@ -12,6 +12,8 @@ const HoverCard = ({
   onView,
   anchor,
   points = [],
+  onMouseEnter,
+  onMouseLeave,
 }) => {
   const width = 320 // px, matches w-80
   const gap = 12
@@ -28,6 +30,8 @@ const HoverCard = ({
     <div
       className="fixed z-[9999] w-80 rounded-xl border border-indigo-500/30 bg-[#0f172a] p-4 shadow-[0_20px_40px_rgba(0,0,0,0.6)] transition duration-200 ease-out"
       style={{ left, top, transform: 'translateZ(0)' }}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
       <div className="mb-1 line-clamp-2 text-sm font-semibold text-white tracking-wide">{title}</div>
       {instructor && <div className="text-xs text-slate-300">{instructor}</div>}

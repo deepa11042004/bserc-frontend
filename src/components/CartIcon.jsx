@@ -1,18 +1,39 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FiShoppingCart } from 'react-icons/fi'
 import { useCart } from '../context/CartContext'
+
+const HOVER_CLOSE_DELAY = 280
 
 const CartIcon = () => {
   const { items, getTotalPrice } = useCart()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
+  const closeTimerRef = useRef(null)
 
   const count = items.length
   const total = getTotalPrice().toFixed(2)
 
+  const handleMouseEnter = () => {
+    if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current)
+    setOpen(true)
+  }
+
+  const handleMouseLeave = () => {
+    if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current)
+    closeTimerRef.current = window.setTimeout(() => {
+      setOpen(false)
+    }, HOVER_CLOSE_DELAY)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current)
+    }
+  }, [])
+
   return (
-    <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+    <div className="relative" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
       <button
         type="button"
         onClick={() => navigate('/cart')}

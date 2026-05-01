@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 
+const PROFILE_HOVER_CLOSE_DELAY = 280
+
 const AuthButtons = ({ user, onLogout }) => {
   const navigate = useNavigate()
   const location = useLocation()
@@ -22,13 +24,20 @@ const AuthButtons = ({ user, onLogout }) => {
   }, [])
 
   const handleMouseEnter = () => {
-    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current)
+    if (hoverTimerRef.current) window.clearTimeout(hoverTimerRef.current)
     setOpen(true)
   }
 
   const handleMouseLeave = () => {
-    hoverTimerRef.current = setTimeout(() => setOpen(false), 120)
+    if (hoverTimerRef.current) window.clearTimeout(hoverTimerRef.current)
+    hoverTimerRef.current = window.setTimeout(() => setOpen(false), PROFILE_HOVER_CLOSE_DELAY)
   }
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimerRef.current) window.clearTimeout(hoverTimerRef.current)
+    }
+  }, [])
 
   const handleLogout = () => {
     setOpen(false)

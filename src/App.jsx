@@ -1,6 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import Home from "./pages/Home";
-import Dashboard from "./pages/Dashboard";
 import CourseDetails from "./pages/CourseDetails";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -34,7 +33,7 @@ function App() {
         path="/dashboard"
         element={
           <ProtectedUserRoute>
-            <Dashboard />
+            <Home />
           </ProtectedUserRoute>
         }
       />

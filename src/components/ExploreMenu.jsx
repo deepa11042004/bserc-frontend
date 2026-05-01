@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ExploreDropdown from './ExploreDropdown'
 import { publicCourseService } from '../services/publicCourseService'
+
+const HOVER_CLOSE_DELAY = 260
 
 const normalizeText = (value = '') => String(value ?? '').trim()
 
@@ -38,6 +40,7 @@ const ExploreMenu = () => {
   const [isExploreOpen, setIsExploreOpen] = useState(false)
   const [activeCategory, setActiveCategory] = useState(0)
   const [menuData, setMenuData] = useState([])
+  const closeTimerRef = useRef(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -76,6 +79,7 @@ const ExploreMenu = () => {
   }, [activeCategory, menuData.length])
 
   const handleOpen = () => {
+    if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current)
     if (menuData.length) {
       setActiveCategory(0)
     }
@@ -83,13 +87,23 @@ const ExploreMenu = () => {
   }
 
   const handleClose = () => {
-    setIsExploreOpen(false)
+    if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current)
+    closeTimerRef.current = window.setTimeout(() => {
+      setIsExploreOpen(false)
+    }, HOVER_CLOSE_DELAY)
   }
 
   const handleChildClick = (categoryLabel, childLabel) => {
+    if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current)
     navigate(`/search?q=${encodeURIComponent(childLabel)}&category=${encodeURIComponent(categoryLabel)}`)
     setIsExploreOpen(false)
   }
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current)
+    }
+  }, [])
 
   return (
     <div className="relative"

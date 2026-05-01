@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { motion as Motion } from 'framer-motion'
 import { FaCheckCircle } from 'react-icons/fa'
 import { FiArrowLeft, FiArrowRight } from 'react-icons/fi'
@@ -13,6 +14,7 @@ import SkeletonCard from '../components/SkeletonCard'
 import TestimonialCard from '../components/TestimonialCard'
 import { useAuthState } from '../hooks/useAuth'
 import { publicCourseService } from '../services/publicCourseService'
+import { getPurchasedCourses } from '../utils/purchases'
 import {
   certifications,
   footerColumns,
@@ -48,11 +50,13 @@ const getLearningPathDescription = (course = {}) => {
 
 function Home() {
   const { user } = useAuthState()
+  const isLoggedIn = Boolean(user)
   const categorySliderRef = useRef(null)
   const updatedSliderRef = useRef(null)
   const [isLoading, setIsLoading] = useState(true)
   const [courseError, setCourseError] = useState('')
   const [courses, setCourses] = useState([])
+  const [purchasedCourses, setPurchasedCourses] = useState(() => getPurchasedCourses())
   const [categoryIndex, setCategoryIndex] = useState(0)
   const [updatedIndex, setUpdatedIndex] = useState(0)
 
@@ -86,8 +90,30 @@ function Home() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setPurchasedCourses([])
+      return
+    }
+
+    const syncPurchased = () => {
+      setPurchasedCourses(getPurchasedCourses())
+    }
+
+    syncPurchased()
+    window.addEventListener('purchased-courses-changed', syncPurchased)
+    window.addEventListener('storage', syncPurchased)
+
+    return () => {
+      window.removeEventListener('purchased-courses-changed', syncPurchased)
+      window.removeEventListener('storage', syncPurchased)
+    }
+  }, [isLoggedIn])
+
   const visibleCourses = useMemo(() => (isLoading ? [] : courses), [courses, isLoading])
   const popularCourses = useMemo(() => visibleCourses.slice(0, 4), [visibleCourses])
+  const skillsCourses = useMemo(() => visibleCourses.slice(0, 4), [visibleCourses])
+  const myLearningCourses = useMemo(() => purchasedCourses.slice(0, 4), [purchasedCourses])
   const learningPathCards = useMemo(() => {
     return visibleCourses
       .map((course) => {
@@ -142,12 +168,30 @@ function Home() {
       (course) => !popularCourseKeys.has(getCourseKey(course)),
     )
 
-    const source = nonPopularCourses.length ? nonPopularCourses : sortedByRecency
-    return source.slice(0, 8)
+    // Keep the section focused on newly updated courses, but top up with popular ones
+    // so the carousel always has a useful number of cards.
+    const merged = [...nonPopularCourses]
+    sortedByRecency.forEach((course) => {
+      if (!merged.includes(course)) {
+        merged.push(course)
+      }
+    })
+
+    return merged.slice(0, 8)
   }, [popularCourses, visibleCourses])
-  const isLearner = Boolean(user && user.role === 'user')
-  const continueLearning = visibleCourses.slice(0, 2)
-  const recommendedCourses = visibleCourses.slice(2, 6)
+  const userDisplayName = useMemo(() => {
+    const fromProfile = normalizeText(user?.name || user?.full_name || user?.fullName)
+    if (fromProfile) return fromProfile
+
+    const emailValue = normalizeText(user?.email)
+    if (!emailValue) return ''
+
+    const emailNamePart = normalizeText(emailValue.split('@')[0])
+    return emailNamePart || emailValue
+  }, [user])
+  const welcomeTitle = userDisplayName
+    ? `Welcome back, BSERC User ${userDisplayName}`
+    : 'Welcome back, BSERC User'
   const learningPathSubtitle = useMemo(() => {
     if (learningPathCards.length) {
       return `${learningPathCards.length} learning paths generated from live course data.`
@@ -184,6 +228,13 @@ function Home() {
 
     return courseError
   }, [courseError, updatedCourses])
+  const myLearningSubtitle = useMemo(() => {
+    if (myLearningCourses.length) {
+      return `Continue your ${myLearningCourses.length} purchased courses from where you left off.`
+    }
+
+    return 'Your enrolled courses will appear here after you start learning.'
+  }, [myLearningCourses.length])
   const skillsSubtitle = useMemo(() => {
     if (visibleCourses.length) {
       const focusAreas = Array.from(
@@ -240,6 +291,21 @@ function Home() {
       <Navbar links={navLinks} />
 
       <main className="mx-auto max-w-7xl space-y-16 px-4 pb-10 pt-6 sm:px-6 lg:px-8">
+        {isLoggedIn && (
+          <section className="rounded-2xl bg-gradient-to-r from-[#0B0F1A] via-[#0f172a] to-[#111827] px-5 py-4 shadow-[0_12px_30px_rgba(0,0,0,0.35)]">
+            <h1 className="text-lg font-semibold text-white sm:text-xl">
+              {userDisplayName ? (
+                <>
+                  Welcome back, BSERC User{' '}
+                  <span className="text-cyan-400">{userDisplayName}</span>
+                </>
+              ) : (
+                'Welcome back, BSERC User'
+              )}
+            </h1>
+          </section>
+        )}
+
         <HeroSection />
 
         <section id="learning-paths" className="py-2">
@@ -440,31 +506,33 @@ function Home() {
           )}
         </section>
 
-        {isLearner && (
-          <section className="space-y-8 py-2">
-            <div>
-              <SectionHeader
-                title="Continue Learning"
-                subtitle="Pick up right where you left off and keep your momentum toward career outcomes."
-              />
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-2">
-                {continueLearning.map((course) => (
-                  <CourseCard key={`continue-${course.slug || course.id || course.title}`} {...course} />
-                ))}
-              </div>
+        {isLoggedIn && (
+          <section id="my-learning-home" className="py-2">
+            <SectionHeader
+              title="My Learning"
+              subtitle={myLearningSubtitle}
+            />
+
+            <div className="mb-4 flex justify-end">
+              <Link
+                to="/my-learning"
+                className="inline-flex items-center justify-center rounded-lg border border-cyan-400/40 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-500/20 hover:text-white"
+              >
+                Open My Learning
+              </Link>
             </div>
 
-            <div>
-              <SectionHeader
-                title="Recommended for You"
-                subtitle="Based on your current interests in aerospace systems, robotics, and AI applications."
-              />
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-                {recommendedCourses.map((course) => (
-                  <CourseCard key={`recommended-${course.slug || course.id || course.title}`} {...course} />
-                ))}
-              </div>
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {myLearningCourses.map((course) => (
+                <CourseCard key={`my-learning-${course.slug || course.apiCourseId || course.courseId || course.title}`} {...course} />
+              ))}
             </div>
+
+            {!myLearningCourses.length && (
+              <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 text-sm text-slate-300">
+                No courses in My Learning yet. Start with any course and it will appear here.
+              </div>
+            )}
           </section>
         )}
 
@@ -518,9 +586,9 @@ function Home() {
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {isLoading
               ? Array.from({ length: 4 }).map((_, index) => <SkeletonCard key={index} />)
-              : visibleCourses.map((course) => <CourseCard key={course.slug || course.id || course.title} {...course} />)}
+              : skillsCourses.map((course) => <CourseCard key={course.slug || course.id || course.title} {...course} />)}
           </div>
-          {!isLoading && !visibleCourses.length && courseError && (
+          {!isLoading && !skillsCourses.length && courseError && (
             <p className="mt-3 text-sm text-slate-400">{courseError}</p>
           )}
         </section>
