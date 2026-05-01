@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { FiChevronDown, FiClock, FiPlayCircle, FiStar, FiUser } from 'react-icons/fi'
+import { FiChevronDown, FiClock, FiPlayCircle, FiStar, FiUser, FiX } from 'react-icons/fi'
 import { useCart } from '../context/CartContext'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
@@ -13,6 +13,42 @@ import { footerColumns } from '../data/homeData'
 import { addPurchasedCourses } from '../utils/purchases'
 import { useAuthState } from '../hooks/useAuth'
 import { publicCourseService } from '../services/publicCourseService'
+
+const extractYouTubeId = (url = '') => {
+  const value = String(url || '').trim()
+  if (!value) return ''
+
+  try {
+    const normalizedInput = /^https?:\/\//i.test(value) ? value : `https://${value.replace(/^\/\//, '')}`
+    const parsed = new URL(normalizedInput)
+    const host = parsed.hostname.replace(/^www\./i, '').toLowerCase()
+
+    if (host === 'youtu.be') {
+      return parsed.pathname.replace('/', '').trim()
+    }
+
+    if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'music.youtube.com') {
+      const idFromQuery = parsed.searchParams.get('v')
+      if (idFromQuery) return idFromQuery.trim()
+
+      const pathParts = parsed.pathname.split('/').filter(Boolean)
+      const embedIndex = pathParts.findIndex((part) => part === 'embed')
+      if (embedIndex >= 0 && pathParts[embedIndex + 1]) {
+        return pathParts[embedIndex + 1].trim()
+      }
+    }
+  } catch {
+    return ''
+  }
+
+  return ''
+}
+
+const toYouTubeEmbedUrl = (url = '') => {
+  const id = extractYouTubeId(url)
+  if (!id) return ''
+  return `https://www.youtube.com/embed/${encodeURIComponent(id)}`
+}
 
 const CourseDetails = () => {
   const location = useLocation()
@@ -73,6 +109,7 @@ const CourseDetails = () => {
   const [openSections, setOpenSections] = useState(courseContent.length ? [0] : [])
   const [isExpandedDescription, setIsExpandedDescription] = useState(false)
   const [isExpandedInstructor, setIsExpandedInstructor] = useState(false)
+  const [activePreviewLesson, setActivePreviewLesson] = useState(null)
 
   useEffect(() => {
     setOpenSections(courseContent.length ? [0] : [])
@@ -106,6 +143,27 @@ const CourseDetails = () => {
 
   const toggleAllSections = () => {
     setOpenSections((prev) => (prev.length === courseContent.length ? [] : allSectionIndices))
+  }
+
+  const handlePreviewClick = (lecture) => {
+    if (!lecture?.preview) return
+
+    const rawUrl = lecture.youtubeUrl || ''
+    const embedUrl = toYouTubeEmbedUrl(rawUrl)
+    const normalizedRawUrl = /^https?:\/\//i.test(rawUrl)
+      ? rawUrl
+      : `https://${String(rawUrl || '').replace(/^\/\//, '').trim()}`
+
+    if (!embedUrl) {
+      window.alert('This preview video is not available right now.')
+      return
+    }
+
+    setActivePreviewLesson({
+      title: lecture.title,
+      rawUrl: normalizedRawUrl,
+      embedUrl,
+    })
   }
 
   const descriptionText = data?.description || 'Course description coming soon.'
@@ -242,10 +300,25 @@ const CourseDetails = () => {
                               </span>
                             )}
                           </div>
-                          <span className="flex items-center gap-1 text-xs text-slate-400">
-                            <FiClock />
-                            {lecture.duration}
-                          </span>
+                          <div className="flex items-center gap-3">
+                            {lecture.preview ? (
+                              <button
+                                type="button"
+                                onClick={() => handlePreviewClick(lecture)}
+                                className="rounded-full bg-emerald-500/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-200 transition hover:bg-emerald-500/25"
+                              >
+                                Watch preview
+                              </button>
+                            ) : (
+                              <span className="rounded-full bg-slate-700/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-300">
+                                Locked
+                              </span>
+                            )}
+                            <span className="flex items-center gap-1 text-xs text-slate-400">
+                              <FiClock />
+                              {lecture.duration}
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -330,6 +403,62 @@ const CourseDetails = () => {
           />
         </div>
       </div>
+
+      {activePreviewLesson && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 px-4"
+          onClick={() => setActivePreviewLesson(null)}
+        >
+          <div
+            className="w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.16em] text-emerald-300">Free Preview</p>
+                <h3 className="text-sm font-semibold text-slate-100">{activePreviewLesson.title}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActivePreviewLesson(null)}
+                className="rounded-full border border-slate-600 p-2 text-slate-200 transition hover:border-slate-500 hover:bg-slate-800"
+                aria-label="Close preview"
+              >
+                <FiX className="text-lg" />
+              </button>
+            </div>
+
+            <div className="aspect-video w-full bg-black">
+              <iframe
+                src={activePreviewLesson.embedUrl}
+                title={activePreviewLesson.title}
+                className="h-full w-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-slate-800 px-4 py-3">
+              <a
+                href={activePreviewLesson.rawUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-lg border border-slate-600 px-3 py-2 text-xs font-semibold text-slate-100 transition hover:border-slate-500 hover:bg-slate-800"
+              >
+                Open in YouTube
+              </a>
+              <button
+                type="button"
+                onClick={() => setActivePreviewLesson(null)}
+                className="rounded-lg bg-indigo-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-indigo-400"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Footer columns={footerColumns} />
     </div>
