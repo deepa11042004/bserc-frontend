@@ -1177,21 +1177,29 @@ const SuperAdminDashboard = () => {
           label="Total Courses"
           value={snapshot.metrics.totalWorkshops}
           helper="Recorded courses in LMS"
+          color="bg-gradient-to-br from-cyan-900 via-cyan-800 to-cyan-900 border-cyan-700"
+          accent="text-cyan-300"
         />
         <SuperAdminMetricCard
           label="Total Videos"
           value={snapshot.metrics.totalVideos}
           helper="Across all modules"
+          color="bg-gradient-to-br from-indigo-900 via-indigo-800 to-indigo-900 border-indigo-700"
+          accent="text-indigo-300"
         />
         <SuperAdminMetricCard
           label="Total Students"
           value={snapshot.metrics.totalStudents}
           helper="With granted access"
+          color="bg-gradient-to-br from-emerald-900 via-emerald-800 to-emerald-900 border-emerald-700"
+          accent="text-emerald-300"
         />
         <SuperAdminMetricCard
           label="Recent Uploads"
           value={snapshot.metrics.recentUploads}
           helper="Completed jobs"
+          color="bg-gradient-to-br from-fuchsia-900 via-fuchsia-800 to-fuchsia-900 border-fuchsia-700"
+          accent="text-fuchsia-300"
         />
       </div>
 
