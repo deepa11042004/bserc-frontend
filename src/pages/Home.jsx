@@ -14,13 +14,13 @@ import TestimonialCard from '../components/TestimonialCard'
 import { useAuthState } from '../hooks/useAuth'
 import { publicCourseService } from '../services/publicCourseService'
 import {
-  careerPaths,
-  categories,
   certifications,
   footerColumns,
   navLinks,
   testimonials,
 } from '../data/homeData'
+
+const normalizeText = (value = '') => String(value ?? '').trim()
 
 const getCourseKey = (course = {}) =>
   String(course.slug || course.apiCourseId || course.id || course.courseId || '')
@@ -31,6 +31,19 @@ const getCourseSortTime = (course = {}) => {
 
   const time = new Date(raw).getTime()
   return Number.isFinite(time) ? time : 0
+}
+
+const getCourseImage = (course = {}) =>
+  normalizeText(course.image || course.thumbnailUrl || course.thumbnail)
+
+const getLearningPathDescription = (course = {}) => {
+  const description = normalizeText(course.description)
+  if (description) return description
+
+  return [course.category, course.level, course.language]
+    .map((item) => normalizeText(item))
+    .filter(Boolean)
+    .join(' • ')
 }
 
 function Home() {
@@ -75,6 +88,48 @@ function Home() {
 
   const visibleCourses = useMemo(() => (isLoading ? [] : courses), [courses, isLoading])
   const popularCourses = useMemo(() => visibleCourses.slice(0, 4), [visibleCourses])
+  const learningPathCards = useMemo(() => {
+    return visibleCourses
+      .map((course) => {
+        const title = normalizeText(course.title)
+        const description = getLearningPathDescription(course) || `${title} learning path`
+        const image = getCourseImage(course)
+
+        if (!title || !description) return null
+
+        return {
+          title,
+          description,
+          image,
+        }
+      })
+      .filter(Boolean)
+      .slice(0, 4)
+  }, [visibleCourses])
+  const specializationCards = useMemo(() => {
+    const uniqueByTitle = new Map()
+
+    visibleCourses.forEach((course) => {
+      const categoryTitle = normalizeText(course.category)
+      const fallbackTitle = normalizeText(course.title)
+      const title = categoryTitle || fallbackTitle
+
+      if (!title) return
+
+      const key = title.toLowerCase()
+      if (uniqueByTitle.has(key)) return
+
+      const image = getCourseImage(course)
+
+      uniqueByTitle.set(key, {
+        title,
+        image,
+      })
+    })
+
+    return Array.from(uniqueByTitle.values()).slice(0, 8)
+  }, [visibleCourses])
+  const specializationCount = specializationCards.length
   const updatedCourses = useMemo(() => {
     if (!visibleCourses.length) return []
 
@@ -93,12 +148,70 @@ function Home() {
   const isLearner = Boolean(user && user.role === 'user')
   const continueLearning = visibleCourses.slice(0, 2)
   const recommendedCourses = visibleCourses.slice(2, 6)
+  const learningPathSubtitle = useMemo(() => {
+    if (learningPathCards.length) {
+      return `${learningPathCards.length} learning paths generated from live course data.`
+    }
+
+    return courseError
+  }, [courseError, learningPathCards.length])
+  const popularSubtitle = useMemo(() => {
+    if (popularCourses.length) {
+      const topics = Array.from(
+        new Set(popularCourses.map((course) => normalizeText(course.category)).filter(Boolean)),
+      )
+      const topicText = topics.length ? ` in ${topics.slice(0, 3).join(', ')}` : ''
+
+      return `${popularCourses.length} courses currently trending${topicText}.`
+    }
+
+    return courseError
+  }, [courseError, popularCourses])
+  const specializationSubtitle = useMemo(() => {
+    if (specializationCount) {
+      return `${specializationCount} specializations extracted from current courses.`
+    }
+
+    return courseError
+  }, [courseError, specializationCount])
+  const updatedSubtitle = useMemo(() => {
+    if (updatedCourses.length) {
+      const lastUpdated = normalizeText(updatedCourses[0]?.lastUpdated)
+      return lastUpdated
+        ? `${updatedCourses.length} recently refreshed courses. Latest update: ${lastUpdated}.`
+        : `${updatedCourses.length} recently refreshed courses.`
+    }
+
+    return courseError
+  }, [courseError, updatedCourses])
+  const skillsSubtitle = useMemo(() => {
+    if (visibleCourses.length) {
+      const focusAreas = Array.from(
+        new Set(
+          visibleCourses
+            .flatMap((course) => [normalizeText(course.category), normalizeText(course.level)])
+            .filter(Boolean),
+        ),
+      )
+
+      const focusText = focusAreas.length ? ` Focus areas: ${focusAreas.slice(0, 4).join(', ')}.` : ''
+      return `${visibleCourses.length} live courses available right now.${focusText}`
+    }
+
+    return courseError
+  }, [courseError, visibleCourses])
 
   useEffect(() => {
     if (!updatedCourses.length) return
     if (updatedIndex < updatedCourses.length) return
     setUpdatedIndex(0)
   }, [updatedCourses.length, updatedIndex])
+
+  useEffect(() => {
+    if (!specializationCount) return
+    if (categoryIndex < specializationCount) return
+    setCategoryIndex(0)
+  }, [categoryIndex, specializationCount])
 
   const scrollSlider = (ref, direction, index, setIndex, length) => {
     if (!ref.current) return
@@ -132,21 +245,27 @@ function Home() {
         <section id="learning-paths" className="py-2">
           <SectionHeader
             title="Choose Your Learning Path"
-            subtitle="Structured tracks to move from fundamentals to role-ready aerospace and robotics outcomes."
+            subtitle={learningPathSubtitle}
           />
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {careerPaths.map((path) => (
+            {learningPathCards.map((path, index) => (
               <Motion.article
-                key={path.title}
+                key={`${path.title}-${index}`}
                 whileHover={{ y: -6, scale: 1.01 }}
                 className="group overflow-hidden rounded-2xl border border-indigo-500/20 bg-[#111827] shadow-[0_10px_30px_rgba(0,0,0,0.4)]"
               >
                 <div className="h-40 overflow-hidden">
-                  <img
-                    src={path.image}
-                    alt={path.title}
-                    className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                  />
+                  {path.image ? (
+                    <img
+                      src={path.image}
+                      alt={path.title}
+                      className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4 text-center text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200/80">
+                      {path.title}
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-3 p-4">
                   <h3 className="text-lg font-semibold text-white">{path.title}</h3>
@@ -161,28 +280,31 @@ function Home() {
               </Motion.article>
             ))}
           </div>
+          {!isLoading && !learningPathCards.length && courseError && (
+            <p className="mt-3 text-sm text-slate-400">{courseError}</p>
+          )}
         </section>
 
         <section id="popular-courses" className="py-2">
           <SectionHeader
             title="Popular Courses"
-            subtitle="Top-rated programs learners are choosing for aerospace, robotics, and AI career growth."
-            action="View all"
+            subtitle={popularSubtitle}
+            action={popularCourses.length ? `View ${popularCourses.length}` : ''}
           />
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {popularCourses.map((course) => (
               <CourseCard key={course.slug || course.id || course.title} {...course} />
             ))}
           </div>
-          {!isLoading && !popularCourses.length && (
-            <p className="mt-3 text-sm text-slate-400">No published courses are available yet.</p>
+          {!isLoading && !popularCourses.length && courseError && (
+            <p className="mt-3 text-sm text-slate-400">{courseError}</p>
           )}
         </section>
 
         <section className="py-2">
           <SectionHeader
             title="Specializations"
-            subtitle="Explore focused domains and choose where you want to specialize next."
+            subtitle={specializationSubtitle}
           />
 
           <div className="relative">
@@ -196,7 +318,7 @@ function Home() {
               }}
               className="flex items-stretch gap-5 overflow-x-auto scroll-smooth px-8 snap-x snap-mandatory no-scrollbar"
             >
-              {categories.map((category, index) => (
+              {specializationCards.map((category, index) => (
                 <div
                   key={`${category.title}-${index}`}
                   className="w-[280px] flex-shrink-0 snap-start"
@@ -210,7 +332,8 @@ function Home() {
             </div>
           </div>
 
-          <div className="mt-4 flex items-center justify-center gap-4">
+          {!!specializationCount && (
+            <div className="mt-4 flex items-center justify-center gap-4">
             <button
               type="button"
               onClick={() =>
@@ -219,17 +342,17 @@ function Home() {
                   'left',
                   categoryIndex,
                   setCategoryIndex,
-                  categories.length
+                  specializationCount
                 )
               }
-              disabled={categoryIndex === 0}
+              disabled={specializationCount <= 1 || categoryIndex === 0}
               className="rounded-full bg-[#0f172a] p-2 shadow-lg shadow-[#3B82F6]/30 transition hover:bg-[#111827] active:scale-95 disabled:opacity-40"
             >
               <FiArrowLeft className="text-[#3B82F6]" />
             </button>
 
             <div className="flex items-center gap-2">
-              {categories.map((_, index) => (
+              {specializationCards.map((_, index) => (
                 <div
                   key={index}
                   className={`h-2 rounded-full transition-all ${index === categoryIndex
@@ -248,21 +371,25 @@ function Home() {
                   'right',
                   categoryIndex,
                   setCategoryIndex,
-                  categories.length
+                  specializationCount
                 )
               }
-              disabled={categoryIndex === categories.length - 1}
+              disabled={specializationCount <= 1 || categoryIndex === specializationCount - 1}
               className="rounded-full bg-[#0f172a] p-2 shadow-lg shadow-[#3B82F6]/30 transition hover:bg-[#111827] active:scale-95 disabled:opacity-40"
             >
               <FiArrowRight className="text-[#3B82F6]" />
             </button>
-          </div>
+            </div>
+          )}
+          {!isLoading && !specializationCount && courseError && (
+            <p className="mt-3 text-sm text-slate-400">{courseError}</p>
+          )}
         </section>
 
         <section className="py-2">
           <SectionHeader
             title="New & Updated Courses"
-            subtitle="Freshly updated modules with current tools, mission workflows, and practical labs."
+            subtitle={updatedSubtitle}
           />
 
           <div className="mb-4 flex justify-end gap-2">
@@ -308,8 +435,8 @@ function Home() {
               </div>
             ))}
           </div>
-          {!isLoading && !updatedCourses.length && (
-            <p className="mt-3 text-sm text-slate-400">Newly updated courses will appear here when available.</p>
+          {!isLoading && !updatedCourses.length && courseError && (
+            <p className="mt-3 text-sm text-slate-400">{courseError}</p>
           )}
         </section>
 
@@ -386,15 +513,15 @@ function Home() {
         <section>
           <SectionHeader
             title="Skills to transform your career and life"
-            subtitle="From practical projects to technical topics, upgrade your professional toolkit."
+            subtitle={skillsSubtitle}
           />
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {isLoading
               ? Array.from({ length: 4 }).map((_, index) => <SkeletonCard key={index} />)
               : visibleCourses.map((course) => <CourseCard key={course.slug || course.id || course.title} {...course} />)}
           </div>
-          {!isLoading && !visibleCourses.length && (
-            <p className="mt-3 text-sm text-slate-400">{courseError || 'No published courses found.'}</p>
+          {!isLoading && !visibleCourses.length && courseError && (
+            <p className="mt-3 text-sm text-slate-400">{courseError}</p>
           )}
         </section>
 

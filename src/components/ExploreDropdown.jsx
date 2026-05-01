@@ -3,6 +3,10 @@ import React from 'react'
 const ExploreDropdown = ({ menuData, activeCategory, setActiveCategory, onChildClick }) => {
   if (!menuData || menuData.length === 0) return null
 
+  const safeActiveCategory = Math.max(0, Math.min(activeCategory, menuData.length - 1))
+  const activeItem = menuData[safeActiveCategory]
+  const activeChildren = Array.isArray(activeItem?.children) ? activeItem.children : []
+
   const leftClass = 'w-1/2'
 
   return (
@@ -13,7 +17,7 @@ const ExploreDropdown = ({ menuData, activeCategory, setActiveCategory, onChildC
       <div className="flex min-h-[280px] items-start divide-x divide-slate-200">
         <div className={`${leftClass} space-y-2 p-4`}>
           {menuData.map((item, index) => {
-            const isActive = index === activeCategory
+            const isActive = index === safeActiveCategory
             const hasChildren = Array.isArray(item.children) && item.children.length > 0
 
             return (
@@ -46,14 +50,14 @@ const ExploreDropdown = ({ menuData, activeCategory, setActiveCategory, onChildC
 
         <div className="w-1/2 p-4">
           <h3 className="mb-3 text-sm font-semibold text-slate-700">
-            {menuData[activeCategory].label}
+            {activeItem?.label}
           </h3>
           <ul className="space-y-1">
-            {menuData[activeCategory].children.map((sub) => (
+            {activeChildren.map((sub) => (
               <li key={sub}>
                 <button
                   type="button"
-                  onClick={() => onChildClick?.(menuData[activeCategory].label, sub)}
+                  onClick={() => onChildClick?.(activeItem?.label, sub)}
                   className="flex w-full items-center rounded-md px-3 py-2 text-left text-sm text-slate-600 transition hover:bg-teal-50 hover:text-teal-700"
                 >
                   {sub}
