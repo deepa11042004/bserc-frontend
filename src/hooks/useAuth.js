@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { clearAuth, getUser, setAuth } from '../utils/auth'
+import { clearAuth, getToken, getUser, setAuth } from '../utils/auth'
 
 export const getStoredUser = () => getUser()
 
-export const setStoredUser = (user, token) => setAuth(token, user)
+export const setStoredUser = (user, token = getToken()) => setAuth(token, user)
 
 export const clearStoredUser = () => clearAuth()
 
