@@ -198,7 +198,7 @@ const Learn = () => {
     return (
       <div className="min-h-screen bg-slate-950 text-white">
         <Navbar />
-        <main className="mx-auto mt-6 max-w-6xl px-4 py-8 text-slate-300">Loading course lessons...</main>
+        <LearnPageSkeleton />
         <Footer columns={footerColumns} />
       </div>
     )
@@ -568,5 +568,40 @@ const Learn = () => {
     </div>
   )
 }
+
+const LearnPageSkeleton = () => (
+  <main className="mx-auto mt-6 max-w-6xl animate-pulse px-4 py-8">
+    <section className="space-y-4">
+      <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-lg">
+        <div className="w-full bg-slate-800" style={{ aspectRatio: '16 / 7' }} />
+        <div className="flex items-center justify-between bg-slate-900/90 px-4 py-3">
+          <div className="space-y-2">
+            <div className="h-4 w-52 rounded bg-slate-700" />
+            <div className="h-3 w-24 rounded bg-slate-700" />
+          </div>
+          <div className="h-3 w-28 rounded bg-slate-700" />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-4 border-b border-slate-800 pb-3">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <div key={`learn-tab-skeleton-${index}`} className="h-6 w-24 rounded bg-slate-800" />
+        ))}
+      </div>
+
+      <div className="space-y-3 max-w-4xl">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={`module-skeleton-${index}`} className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+            <div className="h-4 w-3/5 rounded bg-slate-700" />
+            <div className="mt-3 space-y-2">
+              <div className="h-10 rounded-lg bg-slate-800" />
+              <div className="h-10 rounded-lg bg-slate-800" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  </main>
+)
 
 export default Learn

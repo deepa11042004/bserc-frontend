@@ -106,8 +106,10 @@ const MyLearning = () => {
         </header>
 
         {loadingCourses ? (
-          <div className="rounded-2xl border border-dashed border-indigo-500/40 bg-[#0f172a] p-8 text-center text-slate-300">
-            Loading your enrolled courses...
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <MyLearningCardSkeleton key={`my-learning-skeleton-${index}`} />
+            ))}
           </div>
         ) : courses.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-indigo-500/40 bg-[#0f172a] p-8 text-center text-slate-300">
@@ -170,5 +172,22 @@ const MyLearning = () => {
     </div>
   )
 }
+
+const MyLearningCardSkeleton = () => (
+  <div className="animate-pulse overflow-hidden rounded-xl border border-indigo-500/10 bg-[#0f172a] shadow-[0_8px_22px_rgba(0,0,0,0.28)]">
+    <div className="h-28 w-full bg-slate-800" />
+    <div className="space-y-2 px-3.5 py-3">
+      <div className="h-4 w-4/5 rounded bg-slate-700" />
+      <div className="h-3 w-1/2 rounded bg-slate-700" />
+      <div className="flex gap-1">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <div key={`rating-skeleton-${index}`} className="h-3 w-3 rounded-full bg-slate-700" />
+        ))}
+      </div>
+      <div className="h-2 w-full rounded-full bg-slate-800" />
+      <div className="h-2 w-3/5 rounded-full bg-slate-700" />
+    </div>
+  </div>
+)
 
 export default MyLearning

@@ -200,11 +200,9 @@ const Search = () => {
                 onPreview={() => navigate(`/course/${encodeURIComponent(course.slug || course.courseId || course.id)}`)}
               />
             ))}
-            {loading && (
-              <div className="col-span-full rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-center text-slate-300">
-                Loading published courses...
-              </div>
-            )}
+            {loading && Array.from({ length: pageSize }).map((_, index) => (
+              <CourseResultSkeleton key={`search-skeleton-${index}`} />
+            ))}
             {!loading && pageCourses.length === 0 && (
               <div className="col-span-full rounded-2xl border border-slate-800 bg-slate-900/60 p-6 text-center text-slate-300">
                 {loadError || 'No courses found. Try a different query or relax filters.'}
@@ -251,6 +249,21 @@ const FilterSelect = ({ label, options, value, onChange }) => (
       ))}
     </select>
   </label>
+)
+
+const CourseResultSkeleton = () => (
+  <div className="animate-pulse rounded-2xl border border-slate-800 bg-[#0f172a] p-4 shadow-xl shadow-black/40">
+    <div className="flex gap-4">
+      <div className="h-28 w-44 rounded-lg bg-slate-800" />
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <div className="h-5 w-3/4 rounded bg-slate-700" />
+        <div className="h-4 w-1/2 rounded bg-slate-700" />
+        <div className="h-4 w-full rounded bg-slate-800" />
+        <div className="h-4 w-5/6 rounded bg-slate-800" />
+        <div className="h-9 w-28 rounded-full bg-slate-700" />
+      </div>
+    </div>
+  </div>
 )
 
 const CourseResult = ({ course, onCart, onPreview }) => (

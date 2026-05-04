@@ -220,7 +220,7 @@ const CourseDetails = () => {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100">
         <Navbar />
-        <div className="mx-auto max-w-6xl px-4 py-16 text-slate-300">Loading course details...</div>
+        <CourseDetailsSkeleton />
         <Footer columns={footerColumns} />
       </div>
     )
@@ -495,5 +495,61 @@ const CourseDetails = () => {
     </div>
   )
 }
+
+const CourseDetailsSkeleton = () => (
+  <div className="mx-auto flex max-w-6xl animate-pulse flex-col gap-8 px-4 py-10 lg:flex-row lg:gap-10">
+    <div className="flex-1 space-y-6">
+      <section className="space-y-3 rounded-2xl border border-slate-800/80 bg-slate-900/60 p-6">
+        <div className="flex gap-2">
+          <div className="h-6 w-20 rounded-full bg-slate-800" />
+          <div className="h-6 w-24 rounded-full bg-slate-800" />
+        </div>
+        <div className="h-8 w-5/6 rounded bg-slate-700" />
+        <div className="h-5 w-2/3 rounded bg-slate-800" />
+        <div className="flex gap-3">
+          <div className="h-4 w-20 rounded bg-slate-800" />
+          <div className="h-4 w-24 rounded bg-slate-800" />
+          <div className="h-4 w-28 rounded bg-slate-800" />
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-6">
+        <div className="h-6 w-48 rounded bg-slate-700" />
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={`learn-item-skeleton-${index}`} className="h-10 rounded-lg bg-slate-800" />
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-6">
+        <div className="h-5 w-36 rounded bg-slate-700" />
+        <div className="mt-3 h-4 w-2/3 rounded bg-slate-800" />
+        <div className="mt-5 space-y-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div key={`content-skeleton-${index}`} className="h-14 rounded-xl bg-slate-800/90" />
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-800/80 bg-slate-900/60 p-6">
+        <div className="h-6 w-32 rounded bg-slate-700" />
+        <div className="mt-3 h-4 w-full rounded bg-slate-800" />
+        <div className="mt-2 h-4 w-11/12 rounded bg-slate-800" />
+        <div className="mt-2 h-4 w-3/4 rounded bg-slate-800" />
+      </section>
+    </div>
+
+    <div className="w-full lg:w-96">
+      <section className="rounded-xl border border-slate-800 bg-slate-900/80 p-4">
+        <div className="h-44 w-full rounded-lg bg-slate-800" />
+        <div className="mt-4 h-8 w-32 rounded bg-slate-700" />
+        <div className="mt-2 h-4 w-40 rounded bg-slate-800" />
+        <div className="mt-4 h-10 w-full rounded-lg bg-slate-700" />
+        <div className="mt-3 h-10 w-full rounded-lg bg-slate-800" />
+      </section>
+    </div>
+  </div>
+)
 
 export default CourseDetails

@@ -48,6 +48,16 @@ const getLearningPathDescription = (course = {}) => {
     .join(' • ')
 }
 
+const CategorySkeleton = () => (
+  <div className="animate-pulse overflow-hidden rounded-2xl border border-indigo-500/20 bg-[#111827] p-0 shadow-[0_10px_25px_rgba(0,0,0,0.4)]">
+    <div className="h-44 w-full bg-slate-700" />
+    <div className="flex items-center justify-between p-4">
+      <div className="h-4 w-2/3 rounded bg-slate-700" />
+      <div className="h-8 w-8 rounded-full bg-slate-700" />
+    </div>
+  </div>
+)
+
 function Home() {
   const { user } = useAuthState()
   const isLoggedIn = Boolean(user)
@@ -314,37 +324,39 @@ function Home() {
             subtitle={learningPathSubtitle}
           />
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {learningPathCards.map((path, index) => (
-              <Motion.article
-                key={`${path.title}-${index}`}
-                whileHover={{ y: -6, scale: 1.01 }}
-                className="group overflow-hidden rounded-2xl border border-indigo-500/20 bg-[#111827] shadow-[0_10px_30px_rgba(0,0,0,0.4)]"
-              >
-                <div className="h-40 overflow-hidden">
-                  {path.image ? (
-                    <img
-                      src={path.image}
-                      alt={path.title}
-                      className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4 text-center text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200/80">
-                      {path.title}
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-3 p-4">
-                  <h3 className="text-lg font-semibold text-white">{path.title}</h3>
-                  <p className="text-sm leading-relaxed text-slate-300">{path.description}</p>
-                  <button
-                    type="button"
-                    className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-500/20 hover:text-white"
-                  >
-                    Start Path
-                  </button>
-                </div>
-              </Motion.article>
-            ))}
+            {isLoading
+              ? Array.from({ length: 4 }).map((_, index) => <SkeletonCard key={`learning-skeleton-${index}`} className="p-4" />)
+              : learningPathCards.map((path, index) => (
+                <Motion.article
+                  key={`${path.title}-${index}`}
+                  whileHover={{ y: -6, scale: 1.01 }}
+                  className="group overflow-hidden rounded-2xl border border-indigo-500/20 bg-[#111827] shadow-[0_10px_30px_rgba(0,0,0,0.4)]"
+                >
+                  <div className="h-40 overflow-hidden">
+                    {path.image ? (
+                      <img
+                        src={path.image}
+                        alt={path.title}
+                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-4 text-center text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200/80">
+                        {path.title}
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-3 p-4">
+                    <h3 className="text-lg font-semibold text-white">{path.title}</h3>
+                    <p className="text-sm leading-relaxed text-slate-300">{path.description}</p>
+                    <button
+                      type="button"
+                      className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-500/20 hover:text-white"
+                    >
+                      Start Path
+                    </button>
+                  </div>
+                </Motion.article>
+              ))}
           </div>
           {!isLoading && !learningPathCards.length && courseError && (
             <p className="mt-3 text-sm text-slate-400">{courseError}</p>
@@ -358,9 +370,11 @@ function Home() {
             action={popularCourses.length ? `View ${popularCourses.length}` : ''}
           />
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {popularCourses.map((course) => (
-              <CourseCard key={course.slug || course.id || course.title} {...course} />
-            ))}
+            {isLoading
+              ? Array.from({ length: 4 }).map((_, index) => <SkeletonCard key={`popular-skeleton-${index}`} />)
+              : popularCourses.map((course) => (
+                <CourseCard key={course.slug || course.id || course.title} {...course} />
+              ))}
           </div>
           {!isLoading && !popularCourses.length && courseError && (
             <p className="mt-3 text-sm text-slate-400">{courseError}</p>
@@ -372,80 +386,89 @@ function Home() {
             title="Specializations"
             subtitle={specializationSubtitle}
           />
-
-          <div className="relative">
-            <div
-              ref={categorySliderRef}
-              onScroll={(e) => {
-                const scrollLeft = e.target.scrollLeft
-                const cardWidth = 300
-                const index = Math.round(scrollLeft / cardWidth)
-                setCategoryIndex(index)
-              }}
-              className="flex items-stretch gap-5 overflow-x-auto scroll-smooth px-8 snap-x snap-mandatory no-scrollbar"
-            >
-              {specializationCards.map((category, index) => (
+          {isLoading ? (
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <CategorySkeleton key={`specialization-skeleton-${index}`} />
+              ))}
+            </div>
+          ) : (
+            <>
+              <div className="relative">
                 <div
-                  key={`${category.title}-${index}`}
-                  className="w-[280px] flex-shrink-0 snap-start"
+                  ref={categorySliderRef}
+                  onScroll={(e) => {
+                    const scrollLeft = e.target.scrollLeft
+                    const cardWidth = 300
+                    const index = Math.round(scrollLeft / cardWidth)
+                    setCategoryIndex(index)
+                  }}
+                  className="flex items-stretch gap-5 overflow-x-auto scroll-smooth px-8 snap-x snap-mandatory no-scrollbar"
                 >
-                  <CategoryCard
-                    title={category.title}
-                    image={category.image}
-                  />
+                  {specializationCards.map((category, index) => (
+                    <div
+                      key={`${category.title}-${index}`}
+                      className="w-[280px] flex-shrink-0 snap-start"
+                    >
+                      <CategoryCard
+                        title={category.title}
+                        image={category.image}
+                      />
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
+              </div>
 
-          {!!specializationCount && (
-            <div className="mt-4 flex items-center justify-center gap-4">
-            <button
-              type="button"
-              onClick={() =>
-                scrollSlider(
-                  categorySliderRef,
-                  'left',
-                  categoryIndex,
-                  setCategoryIndex,
-                  specializationCount
-                )
-              }
-              disabled={specializationCount <= 1 || categoryIndex === 0}
-              className="rounded-full bg-[#0f172a] p-2 shadow-lg shadow-[#3B82F6]/30 transition hover:bg-[#111827] active:scale-95 disabled:opacity-40"
-            >
-              <FiArrowLeft className="text-[#3B82F6]" />
-            </button>
+              {!!specializationCount && (
+                <div className="mt-4 flex items-center justify-center gap-4">
+                <button
+                  type="button"
+                  onClick={() =>
+                    scrollSlider(
+                      categorySliderRef,
+                      'left',
+                      categoryIndex,
+                      setCategoryIndex,
+                      specializationCount
+                    )
+                  }
+                  disabled={specializationCount <= 1 || categoryIndex === 0}
+                  className="rounded-full bg-[#0f172a] p-2 shadow-lg shadow-[#3B82F6]/30 transition hover:bg-[#111827] active:scale-95 disabled:opacity-40"
+                >
+                  <FiArrowLeft className="text-[#3B82F6]" />
+                </button>
 
-            <div className="flex items-center gap-2">
-              {specializationCards.map((_, index) => (
-                <div
-                  key={index}
-                  className={`h-2 rounded-full transition-all ${index === categoryIndex
-                    ? 'w-4 bg-purple-500'
-                    : 'w-2 bg-gray-300'
-                    }`}
-                />
-              ))}
-            </div>
+                <div className="flex items-center gap-2">
+                  {specializationCards.map((_, index) => (
+                    <div
+                      key={index}
+                      className={`h-2 rounded-full transition-all ${index === categoryIndex
+                        ? 'w-4 bg-purple-500'
+                        : 'w-2 bg-gray-300'
+                        }`}
+                    />
+                  ))}
+                </div>
 
-            <button
-              type="button"
-              onClick={() =>
-                scrollSlider(
-                  categorySliderRef,
-                  'right',
-                  categoryIndex,
-                  setCategoryIndex,
-                  specializationCount
-                )
-              }
-              disabled={specializationCount <= 1 || categoryIndex === specializationCount - 1}
-              className="rounded-full bg-[#0f172a] p-2 shadow-lg shadow-[#3B82F6]/30 transition hover:bg-[#111827] active:scale-95 disabled:opacity-40"
-            >
-              <FiArrowRight className="text-[#3B82F6]" />
-            </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    scrollSlider(
+                      categorySliderRef,
+                      'right',
+                      categoryIndex,
+                      setCategoryIndex,
+                      specializationCount
+                    )
+                  }
+                  disabled={specializationCount <= 1 || categoryIndex === specializationCount - 1}
+                  className="rounded-full bg-[#0f172a] p-2 shadow-lg shadow-[#3B82F6]/30 transition hover:bg-[#111827] active:scale-95 disabled:opacity-40"
+                >
+                  <FiArrowRight className="text-[#3B82F6]" />
+                </button>
+                </div>
+              )}
+            </>
           )}
           {!isLoading && !specializationCount && courseError && (
             <p className="mt-3 text-sm text-slate-400">{courseError}</p>
@@ -469,7 +492,8 @@ function Home() {
                   updatedCourses.length
                 )
               }
-              className="rounded-full bg-[#0f172a] p-2 shadow-lg shadow-[#3B82F6]/30 text-[#3B82F6] transition hover:bg-[#111827] hover:text-white"
+              disabled={isLoading || updatedCourses.length <= 1 || updatedIndex === 0}
+              className="rounded-full bg-[#0f172a] p-2 shadow-lg shadow-[#3B82F6]/30 text-[#3B82F6] transition hover:bg-[#111827] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
               aria-label="Scroll left"
             >
               <FiArrowLeft />
@@ -484,23 +508,32 @@ function Home() {
                   updatedCourses.length
                 )
               }
-              className="rounded-full bg-[#0f172a] p-2 shadow-lg shadow-[#3B82F6]/30 text-[#3B82F6] transition hover:bg-[#111827] hover:text-white"
+              disabled={isLoading || updatedCourses.length <= 1 || updatedIndex >= updatedCourses.length - 1}
+              className="rounded-full bg-[#0f172a] p-2 shadow-lg shadow-[#3B82F6]/30 text-[#3B82F6] transition hover:bg-[#111827] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
               aria-label="Scroll right"
             >
               <FiArrowRight />
             </button>
           </div>
 
-          <div
-            ref={updatedSliderRef}
-            className="no-scrollbar relative flex snap-x snap-mandatory gap-4 overflow-x-auto rounded-2xl bg-teal-950 p-5"
-          >
-            {updatedCourses.map((course, index) => (
-              <div key={`${course.slug || course.id}-${index}`} className="min-w-[260px] snap-start">
-                <CourseCard {...course} />
-              </div>
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <SkeletonCard key={`updated-skeleton-${index}`} />
+              ))}
+            </div>
+          ) : (
+            <div
+              ref={updatedSliderRef}
+              className="no-scrollbar relative flex snap-x snap-mandatory gap-4 overflow-x-auto rounded-2xl bg-teal-950 p-5"
+            >
+              {updatedCourses.map((course, index) => (
+                <div key={`${course.slug || course.id}-${index}`} className="min-w-[260px] snap-start">
+                  <CourseCard {...course} />
+                </div>
+              ))}
+            </div>
+          )}
           {!isLoading && !updatedCourses.length && courseError && (
             <p className="mt-3 text-sm text-slate-400">{courseError}</p>
           )}
