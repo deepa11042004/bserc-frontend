@@ -13,6 +13,7 @@ import { footerColumns } from '../data/homeData'
 import { addPurchasedCourses } from '../utils/purchases'
 import { useAuthState } from '../hooks/useAuth'
 import { publicCourseService } from '../services/publicCourseService'
+import { startRazorpayCheckout } from '../services/checkoutService'
 
 const extractYouTubeId = (url = '') => {
   const value = String(url || '').trim()
@@ -176,13 +177,43 @@ const CourseDetails = () => {
   const instructorBioShort = instructorProfile.bioShort || 'Instructor bio will be updated soon.'
   const instructorBioFull = instructorProfile.bioLong || instructorBioShort
 
-  const handleBuyNow = () => {
+  const handleBuyNow = async () => {
     if (!user) {
       navigate('/login', { state: { from: location.pathname } })
       return
     }
-    addPurchasedCourses([courseForCart])
-    window.alert('Purchase successful! You can now access the course through My Learning.')
+
+    const priceToPay =
+      data.rawDiscountPrice !== null && data.rawDiscountPrice !== undefined ? data.rawDiscountPrice : data.rawPrice
+
+    if (!priceToPay || priceToPay <= 0) {
+      addPurchasedCourses([courseForCart])
+      window.alert('Enrolled successfully for free! You can now access the course through My Learning.')
+      navigate('/learning')
+      return
+    }
+
+    try {
+      await startRazorpayCheckout({
+        courseId: data?.apiCourseId,
+        amount: priceToPay,
+        description: `Purchase: ${data.title}`,
+        user,
+        onVerified: async () => {
+          addPurchasedCourses([courseForCart])
+        },
+      })
+
+      window.alert('Purchase successful! You can now access the course through My Learning.')
+      navigate('/learning')
+    } catch (error) {
+      if (error?.message === 'Payment was cancelled.') {
+        return
+      }
+
+      console.error('Payment Error:', error)
+      window.alert(error?.message || 'Could not initiate payment.')
+    }
   }
 
   if (isLoading) {

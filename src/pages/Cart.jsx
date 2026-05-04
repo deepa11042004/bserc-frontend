@@ -5,6 +5,7 @@ import { useCart } from '../context/CartContext'
 import { footerColumns } from '../data/homeData'
 import { addPurchasedCourses } from '../utils/purchases'
 import { useAuthState } from '../hooks/useAuth'
+import { startRazorpayCheckout } from '../services/checkoutService'
 
 const Cart = () => {
   const navigate = useNavigate()
@@ -13,7 +14,7 @@ const Cart = () => {
   const total = getTotalPrice()
   const formattedTotal = total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (!user) {
       navigate('/login', { state: { from: '/cart' } })
       return
@@ -23,9 +24,41 @@ const Cart = () => {
       return
     }
 
-    addPurchasedCourses(items)
-    clearCart()
-    window.alert('Purchase successful! You can now access your courses in My Learning.')
+    if (items.length > 1) {
+      window.alert('Please checkout one course at a time for secure enrollment tracking.')
+      return
+    }
+
+    const selectedCourse = items[0]
+    const courseId = Number.parseInt(String(selectedCourse?.apiCourseId ?? ''), 10)
+
+    if (!Number.isInteger(courseId) || courseId <= 0) {
+      window.alert('This cart item is missing a valid course id. Please checkout from course details page.')
+      return
+    }
+
+    try {
+      await startRazorpayCheckout({
+        courseId,
+        amount: total,
+        description: 'Course Purchase',
+        user,
+        onVerified: async () => {
+          addPurchasedCourses([selectedCourse])
+          clearCart()
+        },
+      })
+
+      window.alert('Purchase successful! You can now access your courses in My Learning.')
+      navigate('/learning')
+    } catch (error) {
+      if (error?.message === 'Payment was cancelled.') {
+        return
+      }
+
+      console.error('Payment Error:', error)
+      window.alert(error?.message || 'Could not initiate payment.')
+    }
   }
 
   return (

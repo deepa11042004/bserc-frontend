@@ -10,8 +10,6 @@ const toInt = (value) => {
   return Number.isInteger(parsed) ? parsed : null
 }
 
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-
 const asArray = (payload, keys = ['data', 'results', 'workshops', 'participants']) => {
   if (Array.isArray(payload)) return payload
   if (!payload || typeof payload !== 'object') return []
@@ -951,8 +949,6 @@ const getAssignableInstructors = async () => {
 }
 
 const createWorkshop = async (payload) => {
-  await delay(80)
-
   const token = getToken()
   if (!token) {
     throw new Error('Authentication token missing. Please login again.')
@@ -1067,8 +1063,6 @@ const createWorkshop = async (payload) => {
 }
 
 const updateWorkshop = async (workshopId, payload) => {
-  await delay(70)
-
   const state = readState()
   const current = state.workshops.find((workshop) => workshop.id === workshopId)
   if (!current) {
@@ -1129,8 +1123,6 @@ const updateWorkshop = async (workshopId, payload) => {
 }
 
 const deleteWorkshop = async (workshopId) => {
-  await delay(60)
-
   const state = readState()
   const deleting = state.workshops.find((workshop) => workshop.id === workshopId)
   if (!deleting) return { success: true }
@@ -1157,8 +1149,6 @@ const deleteWorkshop = async (workshopId) => {
 }
 
 const addModule = async (workshopId, title) => {
-  await delay(60)
-
   const state = readState()
   const trimmedTitle = String(title || '').trim()
   if (!trimmedTitle) throw new Error('Module title is required.')
@@ -1190,8 +1180,6 @@ const addModule = async (workshopId, title) => {
 }
 
 const updateModule = async (workshopId, moduleId, payload) => {
-  await delay(50)
-
   const state = readState()
   const workshop = state.workshops.find((item) => item.id === workshopId)
   if (!workshop) throw new Error('Course not found.')
@@ -1228,8 +1216,6 @@ const updateModule = async (workshopId, moduleId, payload) => {
 }
 
 const deleteModule = async (workshopId, moduleId) => {
-  await delay(60)
-
   const state = readState()
   const workshop = state.workshops.find((item) => item.id === workshopId)
   if (!workshop) throw new Error('Course not found.')
@@ -1254,8 +1240,6 @@ const deleteModule = async (workshopId, moduleId) => {
 }
 
 const reorderModules = async (workshopId, sourceIndex, targetIndex) => {
-  await delay(50)
-
   const state = readState()
 
   const nextState = patchWorkshop(state, workshopId, (workshop) => {
@@ -1277,8 +1261,6 @@ const reorderModules = async (workshopId, sourceIndex, targetIndex) => {
 }
 
 const addVideo = async (workshopId, moduleId, payload) => {
-  await delay(90)
-
   const state = readState()
   const workshop = state.workshops.find((item) => item.id === workshopId)
   if (!workshop) throw new Error('Course not found.')
@@ -1337,8 +1319,6 @@ const addVideo = async (workshopId, moduleId, payload) => {
 }
 
 const updateVideo = async (workshopId, moduleId, videoId, payload) => {
-  await delay(60)
-
   const state = readState()
 
   const nextState = patchWorkshop(state, workshopId, (workshop) => {
@@ -1377,8 +1357,6 @@ const updateVideo = async (workshopId, moduleId, videoId, payload) => {
 }
 
 const deleteVideo = async (workshopId, moduleId, videoId) => {
-  await delay(60)
-
   const state = readState()
   const workshop = state.workshops.find((item) => item.id === workshopId)
   if (!workshop) throw new Error('Course not found.')
@@ -1416,8 +1394,6 @@ const deleteVideo = async (workshopId, moduleId, videoId) => {
 }
 
 const reorderVideos = async (workshopId, moduleId, sourceIndex, targetIndex) => {
-  await delay(50)
-
   const state = readState()
 
   const nextState = patchWorkshop(state, workshopId, (workshop) => ({
