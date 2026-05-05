@@ -69,6 +69,21 @@ const TabButton = ({ label, active, onClick }) => (
   </button>
 )
 
+const getEmbedUrl = (url) => {
+  if (!url) return ''
+  if (url.includes('/embed/')) return url
+  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([^&?]+)/)
+  if (match && match[1]) {
+    // Adding multiple params to restrict the player:
+    // rel=0 (no related videos from other channels)
+    // modestbranding=1 (removes YouTube logo)
+    // iv_load_policy=3 (removes annotations)
+    // fs=1 (allows full screen)
+    return `https://www.youtube.com/embed/${match[1]}?autoplay=1&rel=0&modestbranding=1&iv_load_policy=3&fs=1`
+  }
+  return url
+}
+
 const Learn = () => {
   const { courseId } = useParams()
   const navigate = useNavigate()
@@ -84,6 +99,7 @@ const Learn = () => {
   )
 
   const [selectedLesson, setSelectedLesson] = useState(null)
+  const [isPlaying, setIsPlaying] = useState(false)
   const [completedLessons, setCompletedLessons] = useState(() => loadCompleted(progressKey || decodedCourseId))
   const [openModules, setOpenModules] = useState([])
   const [activeTab, setActiveTab] = useState('Overview')
@@ -155,12 +171,14 @@ const Learn = () => {
     if (modules.length) {
       setSelectedLesson(modules[0].lessons[0])
       setOpenModules([modules[0].id])
+      setIsPlaying(false)
     }
   }, [modules])
 
   const handleLessonClick = (lesson) => {
     setSelectedLesson(lesson)
     setOpenResourceLessonId(null)
+    setIsPlaying(true)
   }
 
   const toggleComplete = (lessonId) => {
@@ -214,40 +232,84 @@ const Learn = () => {
       <main className="mx-auto mt-6 max-w-[90rem] px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
-            <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-lg">
+            <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-lg group">
             {selectedLesson ? (
-              selectedLesson.thumbnail ? (
-                <img
-                  key={selectedLesson.id}
-                  src={selectedLesson.thumbnail}
-                  alt={selectedLesson.title}
-                  className="w-full object-cover transition duration-300"
-                  style={{ aspectRatio: '16 / 7' }}
-                />
+              selectedLesson.youtubeUrl && isPlaying ? (
+                <div className="relative w-full bg-black" style={{ paddingTop: '56.25%' }}>
+                  <iframe
+                    key={selectedLesson.id}
+                    src={getEmbedUrl(selectedLesson.youtubeUrl)}
+                    title={selectedLesson.title}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    className="absolute left-0 top-0 h-full w-full border-none"
+                  />
+                  {/* Invisible shield to block the top bar (Title, Share, Watch Later) from being clicked */}
+                  <div className="absolute left-0 right-0 top-0 z-10 h-16" onContextMenu={(e) => e.preventDefault()} />
+                  {/* Invisible shield to block the bottom right YouTube logo click */}
+                  <div className="absolute bottom-0 right-0 z-10 h-12 w-24" onContextMenu={(e) => e.preventDefault()} />
+                </div>
+              ) : selectedLesson.thumbnail ? (
+                <div 
+                  className="relative cursor-pointer" 
+                  onClick={() => selectedLesson.youtubeUrl && setIsPlaying(true)}
+                >
+                  <img
+                    key={selectedLesson.id}
+                    src={selectedLesson.thumbnail}
+                    alt={selectedLesson.title}
+                    className="w-full object-cover transition duration-300 group-hover:brightness-75"
+                    style={{ aspectRatio: '16 / 9' }}
+                  />
+                  {selectedLesson.youtubeUrl && (
+                    <div className="absolute inset-0 flex items-center justify-center opacity-80 transition group-hover:opacity-100 group-hover:scale-110">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-600/90 text-white shadow-xl backdrop-blur-sm">
+                        <FiPlay className="ml-1 h-8 w-8" />
+                      </div>
+                    </div>
+                  )}
+                </div>
               ) : (
-                <div className="w-full bg-slate-800" style={{ aspectRatio: '16 / 7' }} />
+                <div className="flex w-full items-center justify-center bg-slate-800" style={{ aspectRatio: '16 / 9' }}>
+                  {selectedLesson.youtubeUrl && (
+                    <button 
+                      type="button"
+                      onClick={() => setIsPlaying(true)}
+                      className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-600/90 text-white shadow-xl transition hover:scale-110"
+                    >
+                      <FiPlay className="ml-1 h-8 w-8" />
+                    </button>
+                  )}
+                </div>
               )
             ) : (
-              <div className="w-full bg-slate-800" style={{ aspectRatio: '16 / 7' }} />
+              <div className="w-full bg-slate-800" style={{ aspectRatio: '16 / 9' }} />
             )}
-            <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/60 px-4 py-3 text-sm">
-              <div className="flex items-center gap-3">
-                <button type="button" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10">
-                  <FiPlay />
-                </button>
-                <div>
-                  <p className="text-sm font-semibold text-white">{selectedLesson?.title || 'Select a lesson'}</p>
-                  <p className="text-xs text-slate-300">{selectedLesson?.duration || ''}</p>
+            
+            {(!selectedLesson || !selectedLesson.youtubeUrl || !isPlaying) && (
+              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/60 px-4 py-3 text-sm">
+                <div className="flex items-center gap-3">
+                  <button 
+                    type="button" 
+                    onClick={() => selectedLesson?.youtubeUrl && setIsPlaying(true)}
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 transition hover:bg-indigo-600 hover:text-white"
+                  >
+                    <FiPlay />
+                  </button>
+                  <div>
+                    <p className="text-sm font-semibold text-white">{selectedLesson?.title || 'Select a lesson'}</p>
+                    <p className="text-xs text-slate-300">{selectedLesson?.duration || ''}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-slate-300">
+                  <div className="h-1.5 w-32 overflow-hidden rounded-full bg-white/20">
+                    <div className="h-full w-1/3 bg-indigo-400" />
+                  </div>
+                  <FiPause />
                 </div>
               </div>
-              <div className="flex items-center gap-3 text-xs text-slate-300">
-                <div className="h-1.5 w-32 overflow-hidden rounded-full bg-white/20">
-                  <div className="h-full w-1/3 bg-indigo-400" />
-                </div>
-                <FiPause />
-              </div>
+            )}
             </div>
-          </div>
 
             <div className="relative flex flex-wrap gap-4 pb-2">
               <div className="absolute bottom-0 left-0 right-0 h-px bg-slate-800" />
