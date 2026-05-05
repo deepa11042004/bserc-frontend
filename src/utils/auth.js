@@ -39,10 +39,10 @@ export const clearAuth = () => {
 
 export const logoutUser = (navigate) => {
   clearAuth()
-  if (navigate) navigate('/login', { replace: true })
+  if (navigate) navigate('/', { replace: true })
 }
 
 export const logoutAdmin = (navigate) => {
   clearAuth()
-  if (navigate) navigate('/admin/login', { replace: true })
+  if (navigate) navigate('/', { replace: true })
 }

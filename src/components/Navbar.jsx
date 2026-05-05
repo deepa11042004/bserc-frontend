@@ -22,8 +22,7 @@ const Navbar = () => {
 
   const handleLogout = () => {
     clearStoredUser()
-      const isAdmin = user?.role && user.role !== 'user'
-      navigate(isAdmin ? '/admin/login' : '/login', { replace: true })
+    navigate('/', { replace: true })
   }
 
   return (
