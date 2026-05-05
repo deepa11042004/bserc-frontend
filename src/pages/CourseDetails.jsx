@@ -10,7 +10,6 @@ import WhatYouWillLearn from '../components/courseDetails/WhatYouWillLearn'
 import CourseIncludes from '../components/courseDetails/CourseIncludes'
 import RelatedTopics from '../components/courseDetails/RelatedTopics'
 import { footerColumns } from '../data/homeData'
-import { addPurchasedCourses } from '../utils/purchases'
 import { useAuthState } from '../hooks/useAuth'
 import { publicCourseService } from '../services/publicCourseService'
 import { startRazorpayCheckout } from '../services/checkoutService'
@@ -94,18 +93,6 @@ const CourseDetails = () => {
     }
   }, [slug])
 
-  const courseId = data?.slug || data?.courseId || decodeURIComponent(slug || '')
-  const courseForCart = {
-    courseId,
-    slug: data?.slug,
-    apiCourseId: data?.apiCourseId,
-    title: data?.title,
-    price: data?.price,
-    image: data?.videoPreview || data?.thumbnail,
-    thumbnail: data?.thumbnail,
-    instructor: data?.instructor,
-  }
-
   const courseContent = data?.courseContent || []
   const [openSections, setOpenSections] = useState(courseContent.length ? [0] : [])
   const [isExpandedDescription, setIsExpandedDescription] = useState(false)
@@ -187,9 +174,8 @@ const CourseDetails = () => {
       data.rawDiscountPrice !== null && data.rawDiscountPrice !== undefined ? data.rawDiscountPrice : data.rawPrice
 
     if (!priceToPay || priceToPay <= 0) {
-      addPurchasedCourses([courseForCart])
       window.alert('Enrolled successfully for free! You can now access the course through My Learning.')
-      navigate('/learning')
+      navigate('/my-learning')
       return
     }
 
@@ -199,13 +185,10 @@ const CourseDetails = () => {
         amount: priceToPay,
         description: `Purchase: ${data.title}`,
         user,
-        onVerified: async () => {
-          addPurchasedCourses([courseForCart])
-        },
       })
 
       window.alert('Purchase successful! You can now access the course through My Learning.')
-      navigate('/learning')
+      navigate('/my-learning')
     } catch (error) {
       if (error?.message === 'Payment was cancelled.') {
         return

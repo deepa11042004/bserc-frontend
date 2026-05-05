@@ -4,7 +4,6 @@ import { FiChevronDown, FiPlay, FiPause, FiStar, FiDownload, FiCheck, FiClock, F
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { footerColumns } from '../data/homeData'
-import { getPurchasedCourses } from '../utils/purchases'
 import { publicCourseService } from '../services/publicCourseService'
 
 const safeDecodeURIComponent = (value = '') => {
@@ -44,7 +43,7 @@ const loadCompleted = (courseId) => {
   try {
     const raw = localStorage.getItem(`completedLessons_${courseId}`)
     return raw ? JSON.parse(raw) : []
-  } catch (e) {
+  } catch {
     return []
   }
 }
@@ -74,31 +73,20 @@ const Learn = () => {
   const { courseId } = useParams()
   const navigate = useNavigate()
   const decodedCourseId = safeDecodeURIComponent(courseId)
-  const purchasedCourses = useMemo(() => getPurchasedCourses(), [])
-
-  const purchasedCourse = useMemo(() => {
-    return purchasedCourses.find((course) => {
-      const slug = safeDecodeURIComponent(course.slug || '')
-      const savedId = safeDecodeURIComponent(course.courseId || '')
-      const apiId = course.apiCourseId ? String(course.apiCourseId) : ''
-
-      return slug === decodedCourseId || savedId === decodedCourseId || apiId === decodedCourseId
-    })
-  }, [decodedCourseId, purchasedCourses])
 
   const [course, setCourse] = useState(null)
   const [loadingCourse, setLoadingCourse] = useState(true)
   const [courseError, setCourseError] = useState('')
 
   const progressKey = useMemo(
-    () => String(course?.slug || course?.apiCourseId || purchasedCourse?.courseId || decodedCourseId || ''),
-    [course?.apiCourseId, course?.slug, purchasedCourse?.courseId, decodedCourseId],
+    () => String(course?.slug || course?.apiCourseId || decodedCourseId || ''),
+    [course?.apiCourseId, course?.slug, decodedCourseId],
   )
 
   const [selectedLesson, setSelectedLesson] = useState(null)
   const [completedLessons, setCompletedLessons] = useState(() => loadCompleted(progressKey || decodedCourseId))
   const [openModules, setOpenModules] = useState([])
-  const [activeTab, setActiveTab] = useState('Course Content')
+  const [activeTab, setActiveTab] = useState('Overview')
   const [openResourceLessonId, setOpenResourceLessonId] = useState(null)
   const [isDescExpanded, setIsDescExpanded] = useState(false)
 
@@ -109,15 +97,12 @@ const Learn = () => {
       setLoadingCourse(true)
 
       try {
-        const identifier =
-          purchasedCourse?.slug || purchasedCourse?.apiCourseId || purchasedCourse?.courseId || decodedCourseId
-        const fullCourse = await publicCourseService.getCourseFullByIdentifier(identifier)
+        const fullCourse = await publicCourseService.getCourseFullByIdentifier(decodedCourseId)
         if (!active) return
 
         setCourse({
           ...fullCourse,
-          ...purchasedCourse,
-          courseId: fullCourse.slug || fullCourse.courseId || purchasedCourse?.courseId,
+          courseId: fullCourse.slug || fullCourse.courseId,
         })
         setCourseError('')
       } catch (error) {
@@ -137,7 +122,7 @@ const Learn = () => {
     return () => {
       active = false
     }
-  }, [decodedCourseId, purchasedCourse])
+  }, [decodedCourseId])
 
   useEffect(() => {
     setCompletedLessons(loadCompleted(progressKey || decodedCourseId))
@@ -226,9 +211,10 @@ const Learn = () => {
   return (
     <div className="min-h-screen bg-slate-950 text-white">
       <Navbar />
-      <main className="mx-auto mt-6 max-w-6xl px-4 py-8">
-        <section className="space-y-4">
-          <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-lg">
+      <main className="mx-auto mt-6 max-w-[90rem] px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-6">
+            <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-lg">
             {selectedLesson ? (
               selectedLesson.thumbnail ? (
                 <img
@@ -263,83 +249,12 @@ const Learn = () => {
             </div>
           </div>
 
-          <div className="relative flex flex-wrap gap-4 pb-2">
-            <div className="absolute bottom-0 left-0 right-0 h-px bg-slate-800" />
-            {['Course Content', 'Overview', 'FAQ', 'Discussion', 'Reviews'].map((tab) => (
-              <TabButton key={tab} label={tab} active={activeTab === tab} onClick={() => setActiveTab(tab)} />
-            ))}
-          </div>
-
-          {activeTab === 'Course Content' && (
-            <div className="space-y-3 max-w-4xl">
-              {modules.map((module) => (
-                <div key={module.id} className="rounded-xl border border-slate-800 bg-slate-900">
-                  <button
-                    type="button"
-                    onClick={() => toggleModule(module.id)}
-                    className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold text-white"
-                  >
-                    <span>{module.title}</span>
-                    <FiChevronDown
-                      className={`transition-transform ${openModules.includes(module.id) ? 'rotate-180' : ''}`}
-                    />
-                  </button>
-                  {openModules.includes(module.id) && (
-                    <div className="divide-y divide-slate-800">
-                      {module.lessons.map((lesson) => {
-                        const isActive = selectedLesson?.id === lesson.id
-                        const completed = completedLessons.includes(lesson.id)
-                        return (
-                          <div
-                            key={lesson.id}
-                            className={`flex items-center gap-3 px-4 py-3 text-sm transition hover:bg-slate-800/70 ${
-                              isActive ? 'bg-slate-800/60' : ''
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={completed}
-                              onChange={() => toggleComplete(lesson.id)}
-                              className="h-4 w-4 accent-indigo-500"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleLessonClick(lesson)}
-                              className="flex-1 text-left text-slate-200"
-                            >
-                              <div className="font-semibold">{lesson.title}</div>
-                              <div className="text-xs text-slate-400">{lesson.duration}</div>
-                            </button>
-                            <div className="relative" onMouseLeave={() => setOpenResourceLessonId(null)}>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setOpenResourceLessonId((prev) => (prev === lesson.id ? null : lesson.id))
-                                }
-                                className="rounded-lg border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:border-indigo-400"
-                              >
-                                Resources
-                              </button>
-                              {openResourceLessonId === lesson.id && (
-                                <div className="absolute right-0 top-9 z-10 w-48 rounded-lg border border-slate-800 bg-slate-900 p-3 text-xs text-slate-200 shadow-lg">
-                                  {lesson.resources.map((res) => (
-                                    <a key={res.title} href={res.link} className="flex items-center gap-2 py-1 hover:text-indigo-300">
-                                      <FiDownload className="text-indigo-300" />
-                                      <span>{res.title}</span>
-                                    </a>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
+            <div className="relative flex flex-wrap gap-4 pb-2">
+              <div className="absolute bottom-0 left-0 right-0 h-px bg-slate-800" />
+              {['Overview', 'FAQ', 'Discussion', 'Reviews'].map((tab) => (
+                <TabButton key={tab} label={tab} active={activeTab === tab} onClick={() => setActiveTab(tab)} />
               ))}
             </div>
-          )}
 
           {activeTab === 'Overview' && (
             <div className="space-y-6 rounded-xl border border-slate-800 bg-slate-900 p-5 text-slate-200">
@@ -561,7 +476,111 @@ const Learn = () => {
               </div>
             </div>
           )}
-        </section>
+          </div>
+
+          <div className="lg:col-span-1">
+            <div className="sticky top-24 flex max-h-[calc(100vh-8rem)] flex-col rounded-xl border border-slate-800 bg-slate-900/50 p-4 shadow-xl">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-white">Course Content</h2>
+                <span className="text-xs font-medium text-slate-400">{modules.length} Modules</span>
+              </div>
+              
+              <div className="custom-scrollbar flex-1 space-y-3 overflow-y-auto pr-2">
+                {modules.map((module) => (
+                  <div key={module.id} className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/80 transition-colors hover:border-slate-700">
+                    <button
+                      type="button"
+                      onClick={() => toggleModule(module.id)}
+                      className="flex w-full items-center justify-between bg-slate-800/30 px-4 py-3 text-left text-sm font-semibold text-white transition hover:bg-slate-800/50"
+                    >
+                      <span className="pr-4">{module.title}</span>
+                      <FiChevronDown
+                        className={`shrink-0 text-slate-400 transition-transform duration-300 ${openModules.includes(module.id) ? 'rotate-180 text-white' : ''}`}
+                      />
+                    </button>
+                    {openModules.includes(module.id) && (
+                      <div className="divide-y divide-slate-800/60 bg-slate-900/40">
+                        {module.lessons.map((lesson) => {
+                          const isActive = selectedLesson?.id === lesson.id
+                          const completed = completedLessons.includes(lesson.id)
+                          return (
+                            <div
+                              key={lesson.id}
+                              className={`group relative flex items-start gap-3 px-4 py-3 text-sm transition-colors hover:bg-slate-800/60 ${
+                                isActive ? 'bg-indigo-900/20' : ''
+                              }`}
+                            >
+                              <div className="mt-0.5 shrink-0">
+                                <label className="relative flex cursor-pointer items-center justify-center rounded-full">
+                                  <input
+                                    type="checkbox"
+                                    checked={completed}
+                                    onChange={() => toggleComplete(lesson.id)}
+                                    className="peer h-4 w-4 cursor-pointer appearance-none rounded-full border border-slate-600 bg-slate-800/50 transition-all checked:border-indigo-500 checked:bg-indigo-500 hover:border-indigo-400"
+                                  />
+                                  <FiCheck className="pointer-events-none absolute h-3 w-3 text-white opacity-0 transition-opacity peer-checked:opacity-100" />
+                                </label>
+                              </div>
+                              
+                              <button
+                                type="button"
+                                onClick={() => handleLessonClick(lesson)}
+                                className="flex-1 text-left"
+                              >
+                                <div className={`font-medium transition-colors ${isActive ? 'text-indigo-300' : 'text-slate-200 group-hover:text-white'}`}>
+                                  {lesson.title}
+                                </div>
+                                <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
+                                  <FiPlay className={isActive ? 'text-indigo-400' : ''} />
+                                  <span>{lesson.duration}</span>
+                                </div>
+                              </button>
+
+                              {lesson.resources?.length > 0 && (
+                                <div className="relative shrink-0" onMouseLeave={() => setOpenResourceLessonId(null)}>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setOpenResourceLessonId((prev) => (prev === lesson.id ? null : lesson.id))
+                                    }}
+                                    className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-800 hover:text-white"
+                                    title="Resources"
+                                  >
+                                    <FiDownload />
+                                  </button>
+                                  {openResourceLessonId === lesson.id && (
+                                    <div className="absolute right-0 top-9 z-20 w-48 overflow-hidden rounded-xl border border-slate-700 bg-slate-800 shadow-xl">
+                                      <div className="bg-slate-900/50 px-3 py-2 text-xs font-semibold text-slate-300">
+                                        Resources
+                                      </div>
+                                      <div className="p-1">
+                                        {lesson.resources.map((res) => (
+                                          <a
+                                            key={res.title}
+                                            href={res.link}
+                                            className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs text-slate-300 transition hover:bg-slate-700 hover:text-white"
+                                          >
+                                            <FiDownload className="text-indigo-400" />
+                                            <span>{res.title}</span>
+                                          </a>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
 
       </main>
       <Footer columns={footerColumns} />
@@ -570,37 +589,52 @@ const Learn = () => {
 }
 
 const LearnPageSkeleton = () => (
-  <main className="mx-auto mt-6 max-w-6xl animate-pulse px-4 py-8">
-    <section className="space-y-4">
-      <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-lg">
-        <div className="w-full bg-slate-800" style={{ aspectRatio: '16 / 7' }} />
-        <div className="flex items-center justify-between bg-slate-900/90 px-4 py-3">
-          <div className="space-y-2">
-            <div className="h-4 w-52 rounded bg-slate-700" />
-            <div className="h-3 w-24 rounded bg-slate-700" />
+  <main className="mx-auto mt-6 max-w-[90rem] animate-pulse px-4 py-8">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="lg:col-span-2 space-y-6">
+        <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-lg">
+          <div className="w-full bg-slate-800" style={{ aspectRatio: '16 / 7' }} />
+          <div className="flex items-center justify-between bg-slate-900/90 px-4 py-3">
+            <div className="space-y-2">
+              <div className="h-4 w-52 rounded bg-slate-700" />
+              <div className="h-3 w-24 rounded bg-slate-700" />
+            </div>
+            <div className="h-3 w-28 rounded bg-slate-700" />
           </div>
-          <div className="h-3 w-28 rounded bg-slate-700" />
+        </div>
+
+        <div className="flex flex-wrap gap-4 border-b border-slate-800 pb-3">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={`learn-tab-skeleton-${index}`} className="h-6 w-24 rounded bg-slate-800" />
+          ))}
+        </div>
+
+        <div className="space-y-4">
+          <div className="h-32 rounded-xl border border-slate-800 bg-slate-900" />
+          <div className="h-48 rounded-xl border border-slate-800 bg-slate-900" />
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-4 border-b border-slate-800 pb-3">
-        {Array.from({ length: 5 }).map((_, index) => (
-          <div key={`learn-tab-skeleton-${index}`} className="h-6 w-24 rounded bg-slate-800" />
-        ))}
-      </div>
-
-      <div className="space-y-3 max-w-4xl">
-        {Array.from({ length: 4 }).map((_, index) => (
-          <div key={`module-skeleton-${index}`} className="rounded-xl border border-slate-800 bg-slate-900 p-4">
-            <div className="h-4 w-3/5 rounded bg-slate-700" />
-            <div className="mt-3 space-y-2">
-              <div className="h-10 rounded-lg bg-slate-800" />
-              <div className="h-10 rounded-lg bg-slate-800" />
-            </div>
+      <div className="lg:col-span-1">
+        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="h-5 w-32 rounded bg-slate-700" />
+            <div className="h-4 w-16 rounded bg-slate-800" />
           </div>
-        ))}
+          <div className="space-y-3">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={`module-skeleton-${index}`} className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+                <div className="h-4 w-3/5 rounded bg-slate-700" />
+                <div className="mt-3 space-y-2">
+                  <div className="h-10 rounded-lg bg-slate-800" />
+                  <div className="h-10 rounded-lg bg-slate-800" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
-    </section>
+    </div>
   </main>
 )
 

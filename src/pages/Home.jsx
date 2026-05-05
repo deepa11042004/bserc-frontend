@@ -13,8 +13,8 @@ import SupportingSection from '../components/SupportingSection'
 import SkeletonCard from '../components/SkeletonCard'
 import TestimonialCard from '../components/TestimonialCard'
 import { useAuthState } from '../hooks/useAuth'
+import { myLearningService } from '../services/myLearningService'
 import { publicCourseService } from '../services/publicCourseService'
-import { getPurchasedCourses } from '../utils/purchases'
 import {
   certifications,
   footerColumns,
@@ -66,7 +66,7 @@ function Home() {
   const [isLoading, setIsLoading] = useState(true)
   const [courseError, setCourseError] = useState('')
   const [courses, setCourses] = useState([])
-  const [purchasedCourses, setPurchasedCourses] = useState(() => getPurchasedCourses())
+  const [purchasedCourses, setPurchasedCourses] = useState([])
   const [categoryIndex, setCategoryIndex] = useState(0)
   const [updatedIndex, setUpdatedIndex] = useState(0)
 
@@ -106,17 +106,24 @@ function Home() {
       return
     }
 
-    const syncPurchased = () => {
-      setPurchasedCourses(getPurchasedCourses())
+    let active = true
+
+    const syncFromApi = async () => {
+      try {
+        const apiPurchased = await myLearningService.getMyLearningCourses()
+        if (!active) return
+        setPurchasedCourses(apiPurchased)
+      } catch {
+        if (active) {
+          setPurchasedCourses([])
+        }
+      }
     }
 
-    syncPurchased()
-    window.addEventListener('purchased-courses-changed', syncPurchased)
-    window.addEventListener('storage', syncPurchased)
+    void syncFromApi()
 
     return () => {
-      window.removeEventListener('purchased-courses-changed', syncPurchased)
-      window.removeEventListener('storage', syncPurchased)
+      active = false
     }
   }, [isLoggedIn])
 

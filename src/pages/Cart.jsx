@@ -3,7 +3,6 @@ import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { useCart } from '../context/CartContext'
 import { footerColumns } from '../data/homeData'
-import { addPurchasedCourses } from '../utils/purchases'
 import { useAuthState } from '../hooks/useAuth'
 import { startRazorpayCheckout } from '../services/checkoutService'
 
@@ -44,7 +43,6 @@ const Cart = () => {
         description: 'Course Purchase',
         user,
         onVerified: async () => {
-          addPurchasedCourses([selectedCourse])
           clearCart()
         },
       })

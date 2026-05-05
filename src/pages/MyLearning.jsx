@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FiStar, FiTrash2 } from 'react-icons/fi'
+import { FiStar } from 'react-icons/fi'
 import Navbar from '../components/Navbar'
 import Footer from '../components/Footer'
 import { footerColumns } from '../data/homeData'
-import { getPurchasedCourses, removePurchasedCourse } from '../utils/purchases'
 import { publicCourseService } from '../services/publicCourseService'
+import { myLearningService } from '../services/myLearningService'
 
 const tabs = ['All Courses', 'Certificates']
 
@@ -26,18 +26,30 @@ const ProgressBar = ({ progress = 3.5 }) => (
 
 const MyLearning = () => {
   const [activeTab, setActiveTab] = useState('All Courses')
-  const [purchased, setPurchased] = useState(() => getPurchasedCourses())
+  const [purchased, setPurchased] = useState([])
   const [courses, setCourses] = useState([])
   const [loadingCourses, setLoadingCourses] = useState(false)
   const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
-    const sync = () => setPurchased(getPurchasedCourses())
-    window.addEventListener('storage', sync)
-    window.addEventListener('purchased-courses-changed', sync)
+    let active = true
+
+    const syncFromApi = async () => {
+      try {
+        const apiPurchased = await myLearningService.getMyLearningCourses()
+        if (!active) return
+        setPurchased(apiPurchased)
+      } catch {
+        if (active) {
+          setPurchased([])
+        }
+      }
+    }
+
+    void syncFromApi()
+
     return () => {
-      window.removeEventListener('storage', sync)
-      window.removeEventListener('purchased-courses-changed', sync)
+      active = false
     }
   }, [])
 
@@ -68,11 +80,6 @@ const MyLearning = () => {
   useEffect(() => {
     void hydrateCourses(purchasedCourses)
   }, [hydrateCourses, purchasedCourses])
-
-  const handleRemove = (courseId) => {
-    const updated = removePurchasedCourse(courseId)
-    setPurchased(updated)
-  }
 
   const handleViewCourse = (course) => {
     const identifier = course.slug || course.apiCourseId || course.courseId
@@ -133,17 +140,6 @@ const MyLearning = () => {
                   <div className="flex flex-1 flex-col gap-1.5 px-3.5 py-3">
                     <div className="flex items-start justify-between gap-2">
                       <h3 className="text-sm font-semibold text-white line-clamp-2">{course.title}</h3>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleRemove(course.slug || course.courseId || course.apiCourseId)
-                        }}
-                        className="text-xs text-slate-400 transition hover:text-red-300"
-                        aria-label="Remove course"
-                      >
-                        <FiTrash2 />
-                      </button>
                     </div>
                     <p className="text-xs text-slate-400">{course.instructor || 'Instructor'}</p>
                     <div className="flex items-center gap-1 text-sm text-slate-500">
