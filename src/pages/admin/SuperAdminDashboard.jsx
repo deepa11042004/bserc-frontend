@@ -62,6 +62,7 @@ const SECTION_IDS = {
   PERMISSIONS: 'permissions',
   HELP_DESK: 'help-desk',
   FAQ_MANAGEMENT: 'faq-management',
+  EDIT_WORKSHOP: 'edit-workshop',
 }
 
 const INITIAL_WORKSHOP_FORM = {
@@ -81,6 +82,7 @@ const INITIAL_WORKSHOP_FORM = {
   instructorId: '',
   totalDurationMinutes: '',
   thumbnailFile: null,
+  status: 'draft',
 }
 
 const INITIAL_UPLOAD_FORM = {
@@ -243,6 +245,7 @@ const SuperAdminDashboard = () => {
   const [notice, setNotice] = useState('')
 
   const [workshopForm, setWorkshopForm] = useState(INITIAL_WORKSHOP_FORM)
+  const [editingWorkshop, setEditingWorkshop] = useState(null)
   const [workshopThumbPreview, setWorkshopThumbPreview] = useState('')
   const [workshopSlugEdited, setWorkshopSlugEdited] = useState(false)
   const [workshopSearch, setWorkshopSearch] = useState('')
@@ -633,9 +636,10 @@ const SuperAdminDashboard = () => {
       sidebarSections.flatMap((section) => section.items?.map((item) => item.id) || []),
     )
 
-    // Create Course is launched from a button inside All Courses, not from sidebar.
+    // Create Course and Edit Course are launched from buttons inside All Courses, not from sidebar.
     if (allowedIds.has(SECTION_IDS.ALL_WORKSHOPS)) {
       allowedIds.add(SECTION_IDS.CREATE_WORKSHOP)
+      allowedIds.add(SECTION_IDS.EDIT_WORKSHOP)
     }
 
     if (allowedIds.has(activeSection)) return
@@ -656,11 +660,19 @@ const SuperAdminDashboard = () => {
       }
     }
 
+    if (activeSection === SECTION_IDS.EDIT_WORKSHOP) {
+      return {
+        id: SECTION_IDS.EDIT_WORKSHOP,
+        label: 'Edit Course',
+      }
+    }
+
     return allMenuItems.find((item) => item.id === activeSection) || allMenuItems[0]
   }, [activeSection, allMenuItems])
 
   const visibleSection = useMemo(() => {
     if (activeSection === SECTION_IDS.CREATE_WORKSHOP) return SECTION_IDS.CREATE_WORKSHOP;
+    if (activeSection === SECTION_IDS.EDIT_WORKSHOP) return SECTION_IDS.EDIT_WORKSHOP;
     if (activeSection === SECTION_IDS.ALL_WORKSHOPS) return SECTION_IDS.WORKSHOPS;
     if ([SECTION_IDS.UPLOAD_CENTER, SECTION_IDS.UPLOAD_PROGRESS, SECTION_IDS.MEDIA_LIBRARY].includes(activeSection)) return SECTION_IDS.UPLOAD;
     if ([SECTION_IDS.ALL_STUDENTS, SECTION_IDS.ENROLLED_STUDENTS, SECTION_IDS.GRANT_ACCESS, SECTION_IDS.REVOKE_ACCESS].includes(activeSection)) return SECTION_IDS.ACCESS;
@@ -744,12 +756,39 @@ const SuperAdminDashboard = () => {
 
   const clearWorkshopForm = () => {
     setWorkshopForm(INITIAL_WORKSHOP_FORM)
+    setEditingWorkshop(null)
     setWorkshopSlugEdited(false)
     setWorkshopThumbPreview('')
   }
 
   const handleWorkshopThumbChange = (file) => {
     setWorkshopForm((prev) => ({ ...prev, thumbnailFile: file || null }))
+  }
+
+  const handleEditWorkshop = (workshop) => {
+    setEditingWorkshop(workshop)
+    setWorkshopForm({
+      title: workshop.title || '',
+      slug: workshop.slug || '',
+      subtitle: workshop.subtitle || '',
+      description: workshop.description || '',
+      category: workshop.category || 'Course',
+      level: workshop.level || 'Beginner',
+      language: workshop.language || 'English',
+      price: workshop.price != null ? String(workshop.price) : '',
+      discountPrice: workshop.discountPrice != null ? String(workshop.discountPrice) : '',
+      currency: workshop.currency || 'INR',
+      isPaid: Boolean(workshop.isPaid || (workshop.price > 0)),
+      lifetimeAccess: workshop.lifetimeAccess !== undefined ? workshop.lifetimeAccess : true,
+      certificateAvailable: workshop.certificateAvailable !== undefined ? workshop.certificateAvailable : true,
+      instructorId: String(workshop.instructorId || workshop.instructor_id || ''),
+      totalDurationMinutes: workshop.totalDurationMinutes != null ? String(workshop.totalDurationMinutes) : '',
+      thumbnailFile: null,
+      status: workshop.status || 'draft',
+    })
+    setWorkshopSlugEdited(true)
+    setWorkshopThumbPreview(workshop.thumbnailBlobUrl || workshop.thumbnailUrl || '')
+    setActiveSection(SECTION_IDS.EDIT_WORKSHOP)
   }
 
   const handleWorkshopSubmit = async (event) => {
@@ -827,10 +866,18 @@ const SuperAdminDashboard = () => {
         instructorId,
         totalDurationMinutes: Math.round(parsedDuration),
         thumbnailFile: workshopForm.thumbnailFile || null,
+        status: workshopForm.status || 'draft',
       }
 
-      await lmsAdminService.createWorkshop(payload)
-      setFlash('Course created in courses table successfully.')
+      if (editingWorkshop) {
+        const apiCourseId = editingWorkshop.apiCourseId
+        if (!apiCourseId) throw new Error('Cannot update: missing course API id.')
+        await lmsAdminService.updateWorkshopApi(apiCourseId, payload)
+        setFlash('Course updated successfully.')
+      } else {
+        await lmsAdminService.createWorkshop(payload)
+        setFlash('Course created in courses table successfully.')
+      }
 
       clearWorkshopForm()
       await loadSnapshot({ silent: true })
@@ -1408,6 +1455,14 @@ const SuperAdminDashboard = () => {
                       <span className="text-emerald-200">{formatInr(workshop.price || 0)}</span>
                       <span className="text-slate-300">{workshop.enrolledStudents || 0} enrolled</span>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleEditWorkshop(workshop) }}
+                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-sky-700/40 bg-sky-600/10 px-3 py-1.5 text-xs font-medium text-sky-300 transition hover:bg-sky-600/20 hover:text-sky-200"
+                    >
+                      <Pencil className="h-3 w-3" /> Edit Course
+                    </button>
                   </div>
                 </article>
               )
@@ -1424,7 +1479,9 @@ const SuperAdminDashboard = () => {
     )
   }
 
-  const renderCreateWorkshop = () => (
+  const renderCreateWorkshop = () => {
+    const isEditing = Boolean(editingWorkshop)
+    return (
     <section className="space-y-4">
       {snapshot.courseSync && !snapshot.courseSync.ok && (
         <div className="rounded-xl border border-amber-700/70 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
@@ -1435,7 +1492,16 @@ const SuperAdminDashboard = () => {
       <div className="space-y-4">
         <div className="rounded-xl border border-sky-600/20 bg-zinc-900 p-4 shadow-xl shadow-sky-500/10">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-sky-300">Create Course</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-sky-300">{isEditing ? 'Edit Course' : 'Create Course'}</h2>
+            {isEditing && (
+              <button
+                type="button"
+                onClick={() => { clearWorkshopForm(); setActiveSection(SECTION_IDS.ALL_WORKSHOPS) }}
+                className="text-xs text-slate-400 hover:text-slate-200 transition"
+              >
+                ← Back to All Courses
+              </button>
+            )}
           </div>
 
           <form className="space-y-3" onSubmit={handleWorkshopSubmit}>
@@ -1674,12 +1740,26 @@ const SuperAdminDashboard = () => {
               />
             )}
 
+            {isEditing && (
+              <label className="block text-xs uppercase tracking-[0.14em] text-slate-400">
+                Status
+                <select
+                  value={workshopForm.status}
+                  onChange={(event) => setWorkshopForm((prev) => ({ ...prev, status: event.target.value }))}
+                  className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20"
+                >
+                  <option value="draft">Draft</option>
+                  <option value="published">Published</option>
+                </select>
+              </label>
+            )}
+
             <button
               type="submit"
               disabled={busy}
               className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:opacity-70"
             >
-              Create course in courses table
+              {isEditing ? 'Save changes' : 'Create course in courses table'}
             </button>
           </form>
         </div>
@@ -1714,10 +1794,11 @@ const SuperAdminDashboard = () => {
         </div>
       </div>
     </section>
-  )
+    )
+  }
 
   const renderWorkshops = () => {
-    if (activeSection === SECTION_IDS.CREATE_WORKSHOP) {
+    if (activeSection === SECTION_IDS.CREATE_WORKSHOP || activeSection === SECTION_IDS.EDIT_WORKSHOP) {
       return renderCreateWorkshop()
     }
 
@@ -2681,6 +2762,7 @@ const SuperAdminDashboard = () => {
 
   const renderSection = () => {
     if (visibleSection === SECTION_IDS.CREATE_WORKSHOP) return renderCreateWorkshop();
+    if (visibleSection === SECTION_IDS.EDIT_WORKSHOP) return renderCreateWorkshop();
     if (visibleSection === SECTION_IDS.WORKSHOPS) return renderAllWorkshops();
     if (visibleSection === SECTION_IDS.MODULES) return renderModules();
     if (visibleSection === SECTION_IDS.UPLOAD) return renderUploadCenter();

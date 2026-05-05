@@ -1062,6 +1062,86 @@ const createWorkshop = async (payload) => {
   return nextState.workshops.find((entry) => entry.id === workshop.id) || workshop
 }
 
+const updateWorkshopApi = async (apiCourseId, payload) => {
+  const token = getToken()
+  if (!token) {
+    throw new Error('Authentication token missing. Please login again.')
+  }
+
+  const body = {
+    title: payload.title,
+    slug: payload.slug,
+    subtitle: payload.subtitle || null,
+    description: payload.description || null,
+    category: payload.category || 'Course',
+    level: payload.level || 'Beginner',
+    language: payload.language || 'English',
+    price: payload.price ?? 0,
+    discount_price: payload.discountPrice ?? null,
+    currency: payload.currency || 'INR',
+    is_paid: payload.isPaid ? 1 : 0,
+    lifetime_access: payload.lifetimeAccess ? 1 : 0,
+    certificate_available: payload.certificateAvailable ? 1 : 0,
+    is_published: payload.status === 'published' ? 1 : 0,
+    total_duration_minutes: payload.totalDurationMinutes ?? 0,
+  }
+
+  const response = await tryFetchJson(`/api/admin/courses/${apiCourseId}`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+
+  if (!response.ok) {
+    const statusLabel = response.status ? ` (HTTP ${response.status})` : ''
+    throw new Error((response.payload?.message || 'Could not update course.') + statusLabel)
+  }
+
+  const updatedCourse = response.payload?.course || {}
+
+  // Sync local state
+  const state = readState()
+  const workshopId = toCourseWorkshopId(apiCourseId)
+  const current = state.workshops.find((w) => w.id === workshopId || toInt(w.apiCourseId) === apiCourseId) || null
+
+  if (current) {
+    const merged = {
+      ...current,
+      title: normalizeText(updatedCourse.title || payload.title),
+      slug: normalizeText(updatedCourse.slug || payload.slug),
+      subtitle: normalizeText(updatedCourse.subtitle || payload.subtitle || ''),
+      description: normalizeText(updatedCourse.description || payload.description || ''),
+      status: updatedCourse.is_published ? 'published' : (payload.status || 'draft'),
+      isPublished: Boolean(updatedCourse.is_published),
+      category: normalizeText(updatedCourse.category || payload.category || 'Course'),
+      level: normalizeText(updatedCourse.level || payload.level || 'Beginner'),
+      language: normalizeText(updatedCourse.language || payload.language || 'English'),
+      price: Number.isFinite(Number(updatedCourse.price ?? payload.price)) ? Number(updatedCourse.price ?? payload.price) : 0,
+      discountPrice: updatedCourse.discount_price !== undefined ? (Number.isFinite(Number(updatedCourse.discount_price)) ? Number(updatedCourse.discount_price) : null) : (payload.discountPrice ?? null),
+      currency: normalizeText(updatedCourse.currency || payload.currency || 'INR'),
+      isPaid: Boolean(updatedCourse.is_paid ?? payload.isPaid),
+      lifetimeAccess: Boolean(updatedCourse.lifetime_access ?? payload.lifetimeAccess),
+      certificateAvailable: Boolean(updatedCourse.certificate_available ?? payload.certificateAvailable),
+      totalDurationMinutes: Number(updatedCourse.total_duration_minutes || payload.totalDurationMinutes || 0),
+      updatedAt: new Date().toISOString(),
+    }
+
+    const next = withActivity(
+      {
+        ...state,
+        workshops: state.workshops.map((w) => (w.id === current.id ? merged : w)),
+      },
+      { action: 'Updated course', target: merged.title },
+    )
+    writeState(next)
+  }
+
+  return updatedCourse
+}
+
 const updateWorkshop = async (workshopId, payload) => {
   const state = readState()
   const current = state.workshops.find((workshop) => workshop.id === workshopId)
@@ -1695,6 +1775,7 @@ export const lmsAdminService = {
   reorderCourseBuilderLessons,
   publishCourseBuilderCourse,
   createWorkshop,
+  updateWorkshopApi,
   updateWorkshop,
   deleteWorkshop,
   addModule,
