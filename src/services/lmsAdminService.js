@@ -1068,31 +1068,35 @@ const updateWorkshopApi = async (apiCourseId, payload) => {
     throw new Error('Authentication token missing. Please login again.')
   }
 
-  const body = {
-    title: payload.title,
-    slug: payload.slug,
-    subtitle: payload.subtitle || null,
-    description: payload.description || null,
-    category: payload.category || 'Course',
-    level: payload.level || 'Beginner',
-    language: payload.language || 'English',
-    price: payload.price ?? 0,
-    discount_price: payload.discountPrice ?? null,
-    currency: payload.currency || 'INR',
-    is_paid: payload.isPaid ? 1 : 0,
-    lifetime_access: payload.lifetimeAccess ? 1 : 0,
-    certificate_available: payload.certificateAvailable ? 1 : 0,
-    is_published: payload.status === 'published' ? 1 : 0,
-    total_duration_minutes: payload.totalDurationMinutes ?? 0,
+  // Build FormData for multipart upload (to support thumbnail)
+  const formData = new FormData()
+  formData.append('title', payload.title)
+  formData.append('slug', payload.slug)
+  formData.append('subtitle', payload.subtitle || '')
+  formData.append('description', payload.description || '')
+  formData.append('category', payload.category || 'Course')
+  formData.append('level', payload.level || 'Beginner')
+  formData.append('language', payload.language || 'English')
+  formData.append('price', payload.price ?? 0)
+  formData.append('discount_price', payload.discountPrice ?? '')
+  formData.append('currency', payload.currency || 'INR')
+  formData.append('is_paid', payload.isPaid ? 1 : 0)
+  formData.append('lifetime_access', payload.lifetimeAccess ? 1 : 0)
+  formData.append('certificate_available', payload.certificateAvailable ? 1 : 0)
+  formData.append('is_published', payload.status === 'published' ? 1 : 0)
+  formData.append('total_duration_minutes', payload.totalDurationMinutes ?? 0)
+
+  // Append thumbnail file if provided
+  if (payload.thumbnailFile instanceof File) {
+    formData.append('thumbnail', payload.thumbnailFile)
   }
 
   const response = await tryFetchJson(`/api/admin/courses/${apiCourseId}`, {
     method: 'PUT',
     headers: {
       Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
     },
-    body: JSON.stringify(body),
+    body: formData,
   })
 
   if (!response.ok) {
@@ -1126,6 +1130,7 @@ const updateWorkshopApi = async (apiCourseId, payload) => {
       lifetimeAccess: Boolean(updatedCourse.lifetime_access ?? payload.lifetimeAccess),
       certificateAvailable: Boolean(updatedCourse.certificate_available ?? payload.certificateAvailable),
       totalDurationMinutes: Number(updatedCourse.total_duration_minutes || payload.totalDurationMinutes || 0),
+      thumbnailUrl: updatedCourse.thumbnail || current.thumbnailUrl,
       updatedAt: new Date().toISOString(),
     }
 
