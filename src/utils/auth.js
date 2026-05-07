@@ -4,7 +4,7 @@ const TOKEN_KEY = 'token'
 const safeParse = (value) => {
   try {
     return value ? JSON.parse(value) : null
-  } catch (err) {
+  } catch {
     return null
   }
 }

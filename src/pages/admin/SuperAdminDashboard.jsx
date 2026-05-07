@@ -1797,14 +1797,6 @@ const SuperAdminDashboard = () => {
     )
   }
 
-  const renderWorkshops = () => {
-    if (activeSection === SECTION_IDS.CREATE_WORKSHOP || activeSection === SECTION_IDS.EDIT_WORKSHOP) {
-      return renderCreateWorkshop()
-    }
-
-    return renderAllWorkshops()
-  }
-
   const renderModules = () => (
     <section className="grid gap-4 xl:grid-cols-[1.2fr_2fr]">
       <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900 p-4 shadow-lg shadow-sky-500/5">

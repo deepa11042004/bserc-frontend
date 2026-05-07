@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 
 const PROFILE_HOVER_CLOSE_DELAY = 280
 
 const AuthButtons = ({ user, onLogout }) => {
-  const navigate = useNavigate()
   const location = useLocation()
   const { items: cartItems } = useCart()
   const [open, setOpen] = useState(false)

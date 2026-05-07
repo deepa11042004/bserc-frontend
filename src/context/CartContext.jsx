@@ -10,7 +10,6 @@ const normalizeCourse = (course) => {
   if (!course) return null
   const id = course.courseId || course.id || slugify(course.title || '')
   return {
-    courseId: id,
     title: course.title || 'Untitled course',
     price: course.price || '₹0',
     image: course.image,
@@ -25,7 +24,7 @@ export const CartProvider = ({ children }) => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
       return raw ? JSON.parse(raw) : []
-    } catch (err) {
+    } catch {
       return []
     }
   })

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { FiEye, FiEyeOff, FiLock, FiUser } from 'react-icons/fi'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence } from 'framer-motion'
 import Navbar from '../components/Navbar'
 import { getStoredUser } from '../hooks/useAuth'
 import { setAuth } from '../utils/auth'

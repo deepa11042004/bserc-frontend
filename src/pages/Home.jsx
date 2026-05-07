@@ -206,9 +206,6 @@ function Home() {
     const emailNamePart = normalizeText(emailValue.split('@')[0])
     return emailNamePart || emailValue
   }, [user])
-  const welcomeTitle = userDisplayName
-    ? `Welcome back, BSERC User ${userDisplayName}`
-    : 'Welcome back, BSERC User'
   const learningPathSubtitle = useMemo(() => {
     if (learningPathCards.length) {
       return `${learningPathCards.length} learning paths generated from live course data.`

@@ -5,7 +5,7 @@ import { setAuth } from '../utils/auth'
 import { buildApiUrl, parseJsonSafe } from '../utils/apiClient'
 import { useAuthState } from '../hooks/useAuth'
 
-const getRoleRedirect = (role) => '/admin/super-admin-dashboard'
+const getRoleRedirect = () => '/admin/super-admin-dashboard'
 
 const AdminLogin = () => {
   const navigate = useNavigate()
@@ -16,7 +16,7 @@ const AdminLogin = () => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
 
-  const roleRedirect = getRoleRedirect(user?.role)
+  const roleRedirect = getRoleRedirect()
 
   if (user && ['admin', 'instructor', 'super_admin'].includes(user.role)) {
     return <Navigate to={roleRedirect} replace />

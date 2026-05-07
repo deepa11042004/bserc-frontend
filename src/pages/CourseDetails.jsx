@@ -47,7 +47,7 @@ const extractYouTubeId = (url = '') => {
 const toYouTubeEmbedUrl = (url = '') => {
   const id = extractYouTubeId(url)
   if (!id) return ''
-  return `https://www.youtube.com/embed/${encodeURIComponent(id)}`
+  return `https://www.youtube.com/embed/${encodeURIComponent(id)}?autoplay=1&controls=0&disablekb=1&fs=0&modestbranding=1&rel=0&iv_load_policy=3&playsinline=1&cc_load_policy=0`
 }
 
 const CourseDetails = () => {
@@ -93,7 +93,7 @@ const CourseDetails = () => {
     }
   }, [slug])
 
-  const courseContent = data?.courseContent || []
+  const courseContent = useMemo(() => data?.courseContent || [], [data?.courseContent])
   const [openSections, setOpenSections] = useState(courseContent.length ? [0] : [])
   const [isExpandedDescription, setIsExpandedDescription] = useState(false)
   const [isExpandedInstructor, setIsExpandedInstructor] = useState(false)
@@ -412,7 +412,7 @@ const CourseDetails = () => {
             lifetimeAccess={data.lifetimeAccess ?? true}
             couponApplied={data.couponApplied}
             videoPreview={data.videoPreview}
-            onAddToCart={() => addToCart(courseForCart)}
+            onAddToCart={() => addToCart(data)}
             onBuyNow={handleBuyNow}
           />
         </div>
@@ -443,14 +443,17 @@ const CourseDetails = () => {
             </div>
 
             <div className="aspect-video w-full bg-black">
-              <iframe
-                src={activePreviewLesson.embedUrl}
-                title={activePreviewLesson.title}
-                className="h-full w-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                referrerPolicy="strict-origin-when-cross-origin"
-                allowFullScreen
-              />
+              <div className="relative h-full w-full">
+                <iframe
+                  src={activePreviewLesson.embedUrl}
+                  title={activePreviewLesson.title}
+                  className="h-full w-full"
+                  allow="autoplay; encrypted-media"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                />
+                <div className="absolute left-0 right-0 top-0 z-10 h-16" />
+                <div className="absolute bottom-0 right-0 z-10 h-12 w-24" />
+              </div>
             </div>
 
             <div className="flex items-center justify-end gap-3 border-t border-slate-800 px-4 py-3">

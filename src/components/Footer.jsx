@@ -62,14 +62,14 @@ const Footer = () => {
             </p>
 
             <div className="flex items-center gap-3">
-              {socialLinks.map(({ icon: Icon, label, href }) => (
+              {socialLinks.map(({ icon, label, href }) => (
                 <a
                   key={label}
                   href={href}
                   aria-label={label}
                   className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0b1224] text-slate-200 transition hover:text-white hover:scale-105 hover:shadow-[0_0_18px_rgba(59,130,246,0.45)]"
                 >
-                  <Icon size={16} />
+                  {icon({ size: 16 })}
                 </a>
               ))}
             </div>
@@ -113,10 +113,10 @@ const Footer = () => {
           <div>
             <h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">Head Office</h4>
             <ul className="space-y-3 text-sm text-slate-300">
-              {contactItems.map(({ icon: Icon, label }, idx) => (
+              {contactItems.map(({ icon, label }, idx) => (
                 <li key={`${label}-${idx}`} className="flex items-start gap-3">
                   <span className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg bg-[#0b1224] text-[#3B82F6]">
-                    <Icon size={16} />
+                    {icon({ size: 16 })}
                   </span>
                   <span className="leading-relaxed">{label}</span>
                 </li>

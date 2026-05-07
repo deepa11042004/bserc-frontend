@@ -71,15 +71,10 @@ const TabButton = ({ label, active, onClick }) => (
 
 const getEmbedUrl = (url) => {
   if (!url) return ''
-  if (url.includes('/embed/')) return url
   const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([^&?]+)/)
   if (match && match[1]) {
-    // Adding multiple params to restrict the player:
-    // rel=0 (no related videos from other channels)
-    // modestbranding=1 (removes YouTube logo)
-    // iv_load_policy=3 (removes annotations)
-    // fs=1 (allows full screen)
-    return `https://www.youtube.com/embed/${match[1]}?autoplay=1&rel=0&modestbranding=1&iv_load_policy=3&fs=1`
+    // Keep the embed UI minimal across purchased lessons.
+    return `https://www.youtube.com/embed/${match[1]}?autoplay=1&controls=0&disablekb=1&fs=0&modestbranding=1&rel=0&iv_load_policy=3&playsinline=1&cc_load_policy=0`
   }
   return url
 }
@@ -240,8 +235,7 @@ const Learn = () => {
                     key={selectedLesson.id}
                     src={getEmbedUrl(selectedLesson.youtubeUrl)}
                     title={selectedLesson.title}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
+                    allow="autoplay; encrypted-media"
                     className="absolute left-0 top-0 h-full w-full border-none"
                   />
                   {/* Invisible shield to block the top bar (Title, Share, Watch Later) from being clicked */}
